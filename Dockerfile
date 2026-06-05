@@ -23,6 +23,8 @@ WORKDIR /app
 
 ARG APP_VERSION=dev
 ENV APP_VERSION=${APP_VERSION}
+# L'immagine è l'artefatto di produzione: attiva il profilo prod (override con -e SPRING_PROFILES_ACTIVE).
+ENV SPRING_PROFILES_ACTIVE=prod
 LABEL org.opencontainers.image.title="githubresumer" \
       org.opencontainers.image.version="${APP_VERSION}"
 

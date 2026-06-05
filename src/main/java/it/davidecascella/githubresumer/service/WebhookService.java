@@ -1,6 +1,6 @@
 package it.davidecascella.githubresumer.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import it.davidecascella.githubresumer.domain.TrackedRepository;
 import it.davidecascella.githubresumer.domain.User;
 import it.davidecascella.githubresumer.repository.TrackedRepositoryRepository;
