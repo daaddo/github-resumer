@@ -40,4 +40,6 @@ jobs:
 
       # I test girano sul runner: Testcontainers ha accesso al socket Docker di ubuntu-latest.
       - name: Run tests
-        run: ./mvnw -B -ntp verify
+        run: |
+          chmod +x ./mvnw
+          ./mvnw -B -ntp verify

@@ -39,7 +39,9 @@ jobs:
 
       # Eseguiamo i test QUI (sul runner Testcontainers funziona, ha il socket Docker).
       - name: Run tests with Testcontainers
-        run: ./mvnw -B -ntp verify
+        run: |
+          chmod +x ./mvnw
+          ./mvnw -B -ntp verify
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
