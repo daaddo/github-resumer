@@ -1,0 +1,15 @@
+target/
+.git/
+.github/
+.idea/
+*.iml
+.gradle/
+build/
+# Segreti e doc: non servono nell'immagine
+application-local.properties
+src/main/resources/application-local.properties
+*.pem
+*-service-account.json
+firebase-service-account.json
+*.md
+.vscode/

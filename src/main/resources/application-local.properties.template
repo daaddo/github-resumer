@@ -1,0 +1,34 @@
+# =============================================================================
+#  TEMPLATE dei segreti locali.
+#  COPIA questo file in:  application-local.properties   (gia git-ignored)
+#  e riempi i valori reali. NON committare il file con i valori.
+# =============================================================================
+
+# --- Database MySQL locale ---
+DB_USERNAME=root
+DB_PASSWORD=changeme
+
+# --- GitHub App + OAuth ---
+# Dalla pagina della tua GitHub App (Settings > Developer settings > GitHub Apps)
+github.app-id=123456
+github.client-id=Iv1.xxxxxxxxxxxxxxxx
+github.client-secret=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+github.webhook-secret=il-tuo-webhook-secret
+# Private key in formato PKCS#8 (una sola riga, con \n al posto degli a-capo).
+# Converti il .pem scaricato da GitHub (PKCS#1) con:
+#   openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in app.private-key.pem -out app.pkcs8.pem
+github.private-key=-----BEGIN PRIVATE KEY-----\nMIIE...\n-----END PRIVATE KEY-----
+# URL pubblico del backend (es. il tuo tunnel ngrok) usato per il redirect OAuth.
+github.callback-base-url=https://xxxx.ngrok-free.app
+# Deep link dell'app Android a cui rimbalzare il JWT di sessione dopo il login.
+github.app-redirect-uri=githubresumer://auth
+
+# --- Anthropic (Claude) ---
+anthropic.api-key=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# --- JWT di sessione (>= 32 caratteri) ---
+app.jwt.secret=cambia-questo-con-un-segreto-lungo-almeno-32-caratteri
+
+# --- Firebase / FCM (quando lo configuri) ---
+# firebase.enabled=true
+# firebase.service-account-path=file:./firebase-service-account.json
