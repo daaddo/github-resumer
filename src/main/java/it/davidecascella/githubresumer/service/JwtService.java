@@ -13,7 +13,7 @@ import java.time.Instant;
 import java.util.Date;
 
 /**
- * Emette e valida il JWT di sessione consegnato all'app Android dopo il login OAuth.
+ * Emette e valida l'access token (JWT breve) usato come Bearer su /api/**.
  * Il subject del token è l'id interno dell'utente.
  */
 @Service
@@ -28,10 +28,10 @@ public class JwtService {
                     "app.jwt.secret mancante o troppo corto: servono almeno 32 caratteri.");
         }
         this.key = Keys.hmacShaKeyFor(properties.secret().getBytes(StandardCharsets.UTF_8));
-        this.expiration = Duration.ofDays(properties.expirationDays());
+        this.expiration = Duration.ofMinutes(properties.accessTokenMinutes());
     }
 
-    public String issueSessionToken(Long userId, String githubUsername) {
+    public String issueAccessToken(Long userId, String githubUsername) {
         Instant now = Instant.now();
         return Jwts.builder()
                 .subject(String.valueOf(userId))

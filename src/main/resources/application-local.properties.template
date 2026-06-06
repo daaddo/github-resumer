@@ -20,8 +20,9 @@ github.webhook-secret=il-tuo-webhook-secret
 github.private-key=-----BEGIN PRIVATE KEY-----\nMIIE...\n-----END PRIVATE KEY-----
 # URL pubblico del backend (es. il tuo tunnel ngrok) usato per il redirect OAuth.
 github.callback-base-url=https://xxxx.ngrok-free.app
-# Deep link dell'app Android a cui rimbalzare il JWT di sessione dopo il login.
-github.app-redirect-uri=githubresumer://auth
+# App Link HTTPS a cui reindirizzare dopo il login: ci viaggia un codice usa-e-getta (?code=...),
+# non il JWT. L'app Android intercetta questo URL e scambia il codice via POST /auth/exchange.
+github.app-redirect-uri=https://resumer.davidecascella.it/app/auth/callback
 
 # --- Anthropic (Claude) ---
 anthropic.api-key=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

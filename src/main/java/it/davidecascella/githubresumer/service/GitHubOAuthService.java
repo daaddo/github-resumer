@@ -22,17 +22,23 @@ public class GitHubOAuthService {
     private final GitHubApiClient apiClient;
     private final UserService userService;
     private final JwtService jwtService;
+    private final AuthCodeService authCodeService;
+    private final RefreshTokenService refreshTokenService;
 
     public GitHubOAuthService(GitHubProperties properties,
                               GitHubOAuthClient oAuthClient,
                               GitHubApiClient apiClient,
                               UserService userService,
-                              JwtService jwtService) {
+                              JwtService jwtService,
+                              AuthCodeService authCodeService,
+                              RefreshTokenService refreshTokenService) {
         this.properties = properties;
         this.oAuthClient = oAuthClient;
         this.apiClient = apiClient;
         this.userService = userService;
         this.jwtService = jwtService;
+        this.authCodeService = authCodeService;
+        this.refreshTokenService = refreshTokenService;
     }
 
     /** URL a cui reindirizzare il browser per avviare il login. */
@@ -46,8 +52,8 @@ public class GitHubOAuthService {
     }
 
     /**
-     * Completa il login: scambia il code, recupera il profilo, fa upsert dell'utente
-     * ed emette il JWT di sessione da consegnare all'app.
+     * Completa il login: scambia il code di GitHub, recupera il profilo, fa upsert dell'utente
+     * ed emette un codice usa-e-getta (NON il JWT) da consegnare all'app via App Link.
      */
     public String completeLogin(String code) {
         Map<String, String> body = new HashMap<>();
@@ -64,13 +70,38 @@ public class GitHubOAuthService {
 
         GitHubUser githubUser = apiClient.getAuthenticatedUser("Bearer " + token.accessToken());
         User user = userService.upsertFromGitHub(githubUser);
-        return jwtService.issueSessionToken(user.getId(), user.getGithubUsername());
+        return authCodeService.issue(user.getId());
     }
 
-    /** Deep link dell'app con il JWT, usato per rimbalzare la sessione al client dopo il callback. */
-    public String buildAppRedirect(String sessionJwt) {
+    /**
+     * Scambia il codice usa-e-getta con una sessione: consuma il codice (uso singolo) e,
+     * se valido, emette access token + refresh token per l'utente collegato.
+     */
+    public SessionTokens exchangeCodeForSession(String oneTimeCode) {
+        Long userId = authCodeService.consume(oneTimeCode);
+        User user = userService.getById(userId);
+        String accessToken = jwtService.issueAccessToken(user.getId(), user.getGithubUsername());
+        String refreshToken = refreshTokenService.issue(user.getId());
+        return new SessionTokens(accessToken, refreshToken);
+    }
+
+    /** Rinnova la sessione ruotando il refresh token ed emettendo un nuovo access token. */
+    public SessionTokens refreshSession(String refreshToken) {
+        RefreshTokenService.Rotated rotated = refreshTokenService.rotate(refreshToken);
+        User user = userService.getById(rotated.userId());
+        String accessToken = jwtService.issueAccessToken(user.getId(), user.getGithubUsername());
+        return new SessionTokens(accessToken, rotated.refreshToken());
+    }
+
+    /** Revoca il refresh token (logout). */
+    public void logout(String refreshToken) {
+        refreshTokenService.revoke(refreshToken);
+    }
+
+    /** App Link a cui rimbalzare il codice usa-e-getta dopo il callback OAuth. */
+    public String buildAppRedirect(String oneTimeCode) {
         String sep = properties.appRedirectUri().contains("?") ? "&" : "?";
-        return properties.appRedirectUri() + sep + "token=" + enc(sessionJwt);
+        return properties.appRedirectUri() + sep + "code=" + enc(oneTimeCode);
     }
 
     private String enc(String value) {
