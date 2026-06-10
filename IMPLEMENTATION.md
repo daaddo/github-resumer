@@ -51,7 +51,7 @@ GitHub ──push webhook──▶ /webhooks/github
    `github.client-secret`, `github.webhook-secret` e `github.private-key` (in **PKCS#8** — vedi comando
    `openssl` nel template). Imposta il **Webhook URL** della App su `<callback-base-url>/webhooks/github`
    e l'evento **Push**. Imposta la **Callback URL** OAuth su `<callback-base-url>/auth/github/callback`.
-   In locale esponi il backend con un tunnel (es. `ngrok http 8080`) e usa quell'URL come `github.callback-base-url`.
+   Usa l'URL pubblico del backend (`https://api.resumer.davidecascella.it`) come `github.callback-base-url`.
 
 4. **Anthropic**: metti `anthropic.api-key` nel file locale (TODO: ancora da creare la chiave).
 

@@ -18,11 +18,11 @@ github.webhook-secret=il-tuo-webhook-secret
 # Converti il .pem scaricato da GitHub (PKCS#1) con:
 #   openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in app.private-key.pem -out app.pkcs8.pem
 github.private-key=-----BEGIN PRIVATE KEY-----\nMIIE...\n-----END PRIVATE KEY-----
-# URL pubblico del backend (es. il tuo tunnel ngrok) usato per il redirect OAuth.
-github.callback-base-url=https://xxxx.ngrok-free.app
+# URL pubblico del backend usato per il redirect OAuth.
+github.callback-base-url=https://api.resumer.davidecascella.it
 # App Link HTTPS a cui reindirizzare dopo il login: ci viaggia un codice usa-e-getta (?code=...),
 # non il JWT. L'app Android intercetta questo URL e scambia il codice via POST /auth/exchange.
-github.app-redirect-uri=https://resumer.davidecascella.it/app/auth/callback
+github.app-redirect-uri=https://api.resumer.davidecascella.it/app/auth/callback
 
 # --- Anthropic (Claude) ---
 anthropic.api-key=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

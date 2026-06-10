@@ -53,9 +53,10 @@ public class GitHubOAuthService {
 
     /**
      * Completa il login: scambia il code di GitHub, recupera il profilo, fa upsert dell'utente
-     * ed emette un codice usa-e-getta (NON il JWT) da consegnare all'app via App Link.
+     * ed emette un codice usa-e-getta (NON il JWT) da consegnare all'app via App Link. Il codice
+     * resta legato alla code challenge PKCE ricevuta all'avvio del login.
      */
-    public String completeLogin(String code) {
+    public String completeLogin(String code, String codeChallenge) {
         Map<String, String> body = new HashMap<>();
         body.put("client_id", properties.clientId());
         body.put("client_secret", properties.clientSecret());
@@ -70,15 +71,15 @@ public class GitHubOAuthService {
 
         GitHubUser githubUser = apiClient.getAuthenticatedUser("Bearer " + token.accessToken());
         User user = userService.upsertFromGitHub(githubUser);
-        return authCodeService.issue(user.getId());
+        return authCodeService.issue(user.getId(), codeChallenge);
     }
 
     /**
-     * Scambia il codice usa-e-getta con una sessione: consuma il codice (uso singolo) e,
-     * se valido, emette access token + refresh token per l'utente collegato.
+     * Scambia il codice usa-e-getta con una sessione: consuma il codice (uso singolo) verificando
+     * la prova PKCE (code_verifier) e, se valido, emette access token + refresh token per l'utente.
      */
-    public SessionTokens exchangeCodeForSession(String oneTimeCode) {
-        Long userId = authCodeService.consume(oneTimeCode);
+    public SessionTokens exchangeCodeForSession(String oneTimeCode, String codeVerifier) {
+        Long userId = authCodeService.consume(oneTimeCode, codeVerifier);
         User user = userService.getById(userId);
         String accessToken = jwtService.issueAccessToken(user.getId(), user.getGithubUsername());
         String refreshToken = refreshTokenService.issue(user.getId());
@@ -100,8 +101,17 @@ public class GitHubOAuthService {
 
     /** App Link a cui rimbalzare il codice usa-e-getta dopo il callback OAuth. */
     public String buildAppRedirect(String oneTimeCode) {
+        return appRedirect("code", oneTimeCode);
+    }
+
+    /** App Link con un codice d'errore, così l'app non resta appesa nel browser dopo un login fallito. */
+    public String buildAppErrorRedirect(String error) {
+        return appRedirect("error", error);
+    }
+
+    private String appRedirect(String param, String value) {
         String sep = properties.appRedirectUri().contains("?") ? "&" : "?";
-        return properties.appRedirectUri() + sep + "code=" + enc(oneTimeCode);
+        return properties.appRedirectUri() + sep + param + "=" + enc(value);
     }
 
     private String enc(String value) {

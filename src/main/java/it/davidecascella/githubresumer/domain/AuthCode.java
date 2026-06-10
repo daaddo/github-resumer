@@ -38,6 +38,10 @@ public class AuthCode {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
+    /** PKCE: BASE64URL(SHA-256(code_verifier)) ricevuta all'avvio del login (metodo S256, 43 char). */
+    @Column(name = "code_challenge", length = 43)
+    private String codeChallenge;
+
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
