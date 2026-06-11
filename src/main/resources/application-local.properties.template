@@ -20,10 +20,11 @@ github.webhook-secret=il-tuo-webhook-secret
 github.private-key=-----BEGIN PRIVATE KEY-----\nMIIE...\n-----END PRIVATE KEY-----
 # URL pubblico del backend usato per il redirect OAuth.
 github.callback-base-url=https://api.resumer.davidecascella.it
-# App Link HTTPS a cui reindirizzare dopo il login: ci viaggia un codice usa-e-getta (?code=...),
-# non il JWT. L'app Android intercetta questo URL e scambia il codice via POST /auth/exchange.
-github.app-redirect-uri=https://api.resumer.davidecascella.it/app/auth/callback
-# Package dell'app Android: usato nell'URI intent:// per aprirla direttamente dalla pagina di rimbalzo.
+# Custom scheme a cui reindirizzare dopo il login: ci viaggia un codice usa-e-getta (?code=...),
+# non il JWT. Dalla Custom Tab l'app intercetta questo URL e scambia il codice via POST /auth/exchange.
+# Custom scheme (non App Link https) per evitare il blocco anti-loop della Custom Tab -> Play Store.
+github.app-redirect-uri=githubresumer://auth/callback
+# Package dell'app Android. NB: non piu' usato dopo il passaggio al custom scheme (era per l'intent://).
 github.app-package=it.davidecascella.githubresumer
 
 # --- Anthropic (Claude) ---

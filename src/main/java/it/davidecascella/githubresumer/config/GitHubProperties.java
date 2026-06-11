@@ -12,8 +12,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param clientId         OAuth client id.
  * @param clientSecret     OAuth client secret.
  * @param callbackBaseUrl  URL pubblico del backend usato come base per il redirect OAuth.
- * @param appRedirectUri   App Link HTTPS a cui rimbalzare il codice usa-e-getta dopo il login.
- * @param appPackage       Package dell'app Android, usato nell'URI intent:// per aprirla direttamente.
+ * @param appRedirectUri   Custom scheme (githubresumer://auth/callback) a cui rimbalzare il codice usa-e-getta dopo il login.
+ * @param appPackage       Package dell'app Android. Legacy: non piu' usato dopo il passaggio al custom scheme (era per l'intent://).
  */
 @ConfigurationProperties(prefix = "github")
 public record GitHubProperties(

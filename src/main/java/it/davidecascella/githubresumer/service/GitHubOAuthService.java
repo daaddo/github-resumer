@@ -9,7 +9,6 @@ import it.davidecascella.githubresumer.domain.User;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -105,51 +104,41 @@ public class GitHubOAuthService {
 
     /**
      * Pagina HTML che rimbalza il codice usa-e-getta all'app Android dopo il callback OAuth.
-     * Non usiamo un redirect 302 verso l'App Link: Android NON intercetta gli App Link sui
-     * redirect lato server, quindi l'app non si aprirebbe. Restituiamo invece una pagina che
-     * apre l'app via URI intent:// (con fallback al browser se l'app non è installata).
+     * Il ritorno usa un custom scheme (es. githubresumer://auth/callback): dalla Custom Tab l'OS
+     * consegna l'URL all'app che possiede l'intent-filter. Evita l'intent://...;package=<app stessa>,
+     * che dentro una Custom Tab veniva bloccato (anti-loop) e degradava nel Play Store (market://).
      */
     public String buildAppRedirectPage(String oneTimeCode) {
-        return page(intentUrl("code", oneTimeCode));
+        return page(appUrl("code", oneTimeCode));
     }
 
     /** Pagina HTML con un codice d'errore, così l'app non resta appesa nel browser dopo un login fallito. */
     public String buildAppErrorPage(String error) {
-        return page(intentUrl("error", error));
+        return page(appUrl("error", error));
     }
 
-    /**
-     * Costruisce l'URI intent:// che apre direttamente l'app per package, con scheme=https così
-     * combacia con l'App Link verificato; se l'app non è installata Chrome usa browser_fallback_url.
-     */
-    private String intentUrl(String param, String value) {
-        String appLink = properties.appRedirectUri();
-        URI uri = URI.create(appLink);
-        String scheme = uri.getScheme();
-        String authorityAndPath = appLink.substring(scheme.length() + 3); // toglie "<scheme>://"
-        String sep = appLink.contains("?") ? "&" : "?";
-        String query = sep + param + "=" + enc(value);
-        String fallbackUrl = appLink + query;
-        String intentUrl = "intent://" + authorityAndPath + query
-                + "#Intent;scheme=" + scheme
-                + ";package=" + properties.appPackage()
-                + ";S.browser_fallback_url=" + enc(fallbackUrl)
-                + ";end";
-        log.info("Pagina di rimbalzo all'app: appRedirectUri={}, package={}, scheme={}", appLink, properties.appPackage(), scheme);
-        log.info("URL intent generato: {}", intentUrl);
-        log.info("Browser fallback URL: {}", fallbackUrl);
-        return intentUrl;
+    /** Costruisce l'URL custom-scheme che riapre l'app col codice usa-e-getta (o con l'errore). */
+    private String appUrl(String param, String value) {
+        String base = properties.appRedirectUri();
+        String sep = base.contains("?") ? "&" : "?";
+        String url = base + sep + param + "=" + enc(value);
+        log.info("Redirect all'app: appRedirectUri={}, url={}", base, url);
+        return url;
     }
 
-    private String page(String intentUrl) {
+    private String page(String appUrl) {
         return "<!DOCTYPE html>\n"
                 + "<html lang=\"it\"><head><meta charset=\"utf-8\">"
                 + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
                 + "<title>Apertura app…</title></head>"
                 + "<body style=\"font-family:sans-serif;text-align:center;padding:2rem\">"
                 + "<p>Apertura dell'app in corso…</p>"
-                + "<p><a href=\"" + htmlEscape(intentUrl) + "\">Tocca qui se l'app non si apre</a></p>"
-                + "<script>window.location.replace('" + jsEscape(intentUrl) + "');</script>"
+                + "<p><a href=\"" + htmlEscape(appUrl) + "\" "
+                + "style=\"display:inline-block;padding:0.9rem 1.6rem;background:#24292f;color:#fff;"
+                + "text-decoration:none;border-radius:8px;font-size:1.1rem;font-weight:600\">"
+                + "Apri GitHub Resumer</a></p>"
+                + "<p style=\"color:#666;font-size:0.9rem\">Se l'app non si apre da sola, tocca il pulsante qui sopra.</p>"
+                + "<script>window.location.replace('" + jsEscape(appUrl) + "');</script>"
                 + "</body></html>";
     }
 

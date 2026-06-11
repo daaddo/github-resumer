@@ -81,9 +81,9 @@ public class AuthController {
     /**
      * Callback chiamata da GitHub. Verifica lo state, gestisce il rifiuto/gli errori e i fallimenti
      * di login, e in OGNI caso restituisce una pagina HTML che rimbalza all'app (con ?code=... o
-     * ?error=...): così l'app non resta mai bloccata nel browser. NON usiamo un redirect 302 perché
-     * Android non intercetta gli App Link sui redirect lato server; la pagina apre l'app via
-     * intent://. Il cookie di state viene sempre ripulito.
+     * ?error=...): così l'app non resta mai bloccata nel browser. La pagina riapre l'app tramite
+     * custom scheme (githubresumer://auth/callback), che dalla Custom Tab viene consegnato all'app
+     * senza il blocco anti-loop dell'intent://. Il cookie di state viene sempre ripulito.
      */
     @GetMapping("/github/callback")
     public ResponseEntity<String> callback(
