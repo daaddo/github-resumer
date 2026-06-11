@@ -61,6 +61,7 @@ public class AuthController {
     public ResponseEntity<Void> login(
             @RequestParam("code_challenge") String codeChallenge,
             @RequestParam("code_challenge_method") String codeChallengeMethod) {
+        log.info("Avvio login OAuth: code_challenge_method={}, code_challenge={}", codeChallengeMethod, codeChallenge);
 
         if (!PKCE_METHOD_S256.equals(codeChallengeMethod)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "code_challenge_method deve essere S256");
@@ -91,6 +92,8 @@ public class AuthController {
             @RequestParam(value = "error", required = false) String error,
             @CookieValue(value = STATE_COOKIE, required = false) String expectedState,
             @CookieValue(value = CHALLENGE_COOKIE, required = false) String codeChallenge) {
+        log.info("Callback OAuth ricevuta: code presente={}, error={}, challenge presente={}",
+                code != null && !code.isBlank(), error, codeChallenge != null && !codeChallenge.isBlank());
 
         String body;
         if (!stateMatches(expectedState, state)) {
@@ -100,12 +103,15 @@ public class AuthController {
             log.warn("Callback OAuth senza code challenge PKCE");
             body = oAuthService.buildAppErrorPage("missing_challenge");
         } else if (error != null && !error.isBlank()) {
+            log.warn("Callback OAuth con errore da GitHub: {}", error);
             body = oAuthService.buildAppErrorPage(error);
         } else if (code == null || code.isBlank()) {
+            log.warn("Callback OAuth senza authorization code");
             body = oAuthService.buildAppErrorPage("missing_code");
         } else {
             try {
                 body = oAuthService.buildAppRedirectPage(oAuthService.completeLogin(code, codeChallenge));
+                log.info("Login OAuth completato: codice usa-e-getta emesso, rimbalzo all'app");
             } catch (Exception e) {
                 log.warn("Login OAuth fallito", e);
                 body = oAuthService.buildAppErrorPage("login_failed");
@@ -122,20 +128,25 @@ public class AuthController {
     /** L'app scambia il codice usa-e-getta con access token + refresh token (back-channel HTTPS). */
     @PostMapping("/exchange")
     public SessionResponse exchange(@Valid @RequestBody ExchangeRequest request) {
+        log.info("Richiesta scambio codice usa-e-getta -> sessione");
         SessionTokens tokens = oAuthService.exchangeCodeForSession(request.code(), request.codeVerifier());
+        log.info("Scambio riuscito: access token + refresh token emessi");
         return new SessionResponse(tokens.accessToken(), tokens.refreshToken());
     }
 
     /** Rinnova la sessione: ruota il refresh token e restituisce un nuovo access token. */
     @PostMapping("/refresh")
     public SessionResponse refresh(@Valid @RequestBody RefreshRequest request) {
+        log.info("Richiesta refresh sessione");
         SessionTokens tokens = oAuthService.refreshSession(request.refreshToken());
+        log.info("Sessione rinnovata: refresh token ruotato, nuovo access token emesso");
         return new SessionResponse(tokens.accessToken(), tokens.refreshToken());
     }
 
     /** Logout: revoca il refresh token presentato. */
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@Valid @RequestBody RefreshRequest request) {
+        log.info("Richiesta logout: revoca refresh token");
         oAuthService.logout(request.refreshToken());
         return ResponseEntity.noContent().build();
     }
