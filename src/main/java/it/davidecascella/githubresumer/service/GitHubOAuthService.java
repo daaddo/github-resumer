@@ -8,6 +8,7 @@ import it.davidecascella.githubresumer.config.GitHubProperties;
 import it.davidecascella.githubresumer.domain.User;
 import org.springframework.stereotype.Service;
 
+import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -65,6 +66,7 @@ public class GitHubOAuthService {
 
         GitHubTokenResponse token = oAuthClient.exchangeCodeForToken(body);
         if (token.accessToken() == null || token.accessToken().isBlank()) {
+
             throw new IllegalStateException("Scambio OAuth fallito: "
                     + (token.error() != null ? token.error() : "nessun access_token"));
         }
@@ -99,19 +101,63 @@ public class GitHubOAuthService {
         refreshTokenService.revoke(refreshToken);
     }
 
-    /** App Link a cui rimbalzare il codice usa-e-getta dopo il callback OAuth. */
-    public String buildAppRedirect(String oneTimeCode) {
-        return appRedirect("code", oneTimeCode);
+    /**
+     * Pagina HTML che rimbalza il codice usa-e-getta all'app Android dopo il callback OAuth.
+     * Non usiamo un redirect 302 verso l'App Link: Android NON intercetta gli App Link sui
+     * redirect lato server, quindi l'app non si aprirebbe. Restituiamo invece una pagina che
+     * apre l'app via URI intent:// (con fallback al browser se l'app non è installata).
+     */
+    public String buildAppRedirectPage(String oneTimeCode) {
+        return page(intentUrl("code", oneTimeCode));
     }
 
-    /** App Link con un codice d'errore, così l'app non resta appesa nel browser dopo un login fallito. */
-    public String buildAppErrorRedirect(String error) {
-        return appRedirect("error", error);
+    /** Pagina HTML con un codice d'errore, così l'app non resta appesa nel browser dopo un login fallito. */
+    public String buildAppErrorPage(String error) {
+        return page(intentUrl("error", error));
     }
 
-    private String appRedirect(String param, String value) {
-        String sep = properties.appRedirectUri().contains("?") ? "&" : "?";
-        return properties.appRedirectUri() + sep + param + "=" + enc(value);
+    /**
+     * Costruisce l'URI intent:// che apre direttamente l'app per package, con scheme=https così
+     * combacia con l'App Link verificato; se l'app non è installata Chrome usa browser_fallback_url.
+     */
+    private String intentUrl(String param, String value) {
+        String appLink = properties.appRedirectUri();
+        URI uri = URI.create(appLink);
+        String scheme = uri.getScheme();
+        String authorityAndPath = appLink.substring(scheme.length() + 3); // toglie "<scheme>://"
+        String sep = appLink.contains("?") ? "&" : "?";
+        String query = sep + param + "=" + enc(value);
+        return "intent://" + authorityAndPath + query
+                + "#Intent;scheme=" + scheme
+                + ";package=" + properties.appPackage()
+                + ";S.browser_fallback_url=" + enc(appLink + query)
+                + ";end";
+    }
+
+    private String page(String intentUrl) {
+        return "<!DOCTYPE html>\n"
+                + "<html lang=\"it\"><head><meta charset=\"utf-8\">"
+                + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+                + "<title>Apertura app…</title></head>"
+                + "<body style=\"font-family:sans-serif;text-align:center;padding:2rem\">"
+                + "<p>Apertura dell'app in corso…</p>"
+                + "<p><a href=\"" + htmlEscape(intentUrl) + "\">Tocca qui se l'app non si apre</a></p>"
+                + "<script>window.location.replace('" + jsEscape(intentUrl) + "');</script>"
+                + "</body></html>";
+    }
+
+    private String htmlEscape(String value) {
+        return value.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&#39;");
+    }
+
+    private String jsEscape(String value) {
+        return value.replace("\\", "\\\\")
+                .replace("'", "\\'")
+                .replace("<", "\\x3C"); // evita la chiusura anticipata di </script>
     }
 
     private String enc(String value) {

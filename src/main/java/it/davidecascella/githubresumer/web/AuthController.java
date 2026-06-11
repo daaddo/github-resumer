@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CookieValue;
@@ -78,42 +79,44 @@ public class AuthController {
 
     /**
      * Callback chiamata da GitHub. Verifica lo state, gestisce il rifiuto/gli errori e i fallimenti
-     * di login, e in OGNI caso rimbalza all'App Link (con ?code=... o ?error=...): così l'app non
-     * resta mai bloccata nel browser. Il cookie di state viene sempre ripulito.
+     * di login, e in OGNI caso restituisce una pagina HTML che rimbalza all'app (con ?code=... o
+     * ?error=...): così l'app non resta mai bloccata nel browser. NON usiamo un redirect 302 perché
+     * Android non intercetta gli App Link sui redirect lato server; la pagina apre l'app via
+     * intent://. Il cookie di state viene sempre ripulito.
      */
     @GetMapping("/github/callback")
-    public ResponseEntity<Void> callback(
+    public ResponseEntity<String> callback(
             @RequestParam(value = "code", required = false) String code,
             @RequestParam(value = "state", required = false) String state,
             @RequestParam(value = "error", required = false) String error,
             @CookieValue(value = STATE_COOKIE, required = false) String expectedState,
             @CookieValue(value = CHALLENGE_COOKIE, required = false) String codeChallenge) {
 
-        String target;
+        String body;
         if (!stateMatches(expectedState, state)) {
             log.warn("Callback OAuth con state non valido");
-            target = oAuthService.buildAppErrorRedirect("invalid_state");
+            body = oAuthService.buildAppErrorPage("invalid_state");
         } else if (codeChallenge == null || codeChallenge.isBlank()) {
             log.warn("Callback OAuth senza code challenge PKCE");
-            target = oAuthService.buildAppErrorRedirect("missing_challenge");
+            body = oAuthService.buildAppErrorPage("missing_challenge");
         } else if (error != null && !error.isBlank()) {
-            target = oAuthService.buildAppErrorRedirect(error);
+            body = oAuthService.buildAppErrorPage(error);
         } else if (code == null || code.isBlank()) {
-            target = oAuthService.buildAppErrorRedirect("missing_code");
+            body = oAuthService.buildAppErrorPage("missing_code");
         } else {
             try {
-                target = oAuthService.buildAppRedirect(oAuthService.completeLogin(code, codeChallenge));
+                body = oAuthService.buildAppRedirectPage(oAuthService.completeLogin(code, codeChallenge));
             } catch (Exception e) {
                 log.warn("Login OAuth fallito", e);
-                target = oAuthService.buildAppErrorRedirect("login_failed");
+                body = oAuthService.buildAppErrorPage("login_failed");
             }
         }
 
-        return ResponseEntity.status(HttpStatus.FOUND)
+        return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie(STATE_COOKIE, "", Duration.ZERO).toString())
                 .header(HttpHeaders.SET_COOKIE, cookie(CHALLENGE_COOKIE, "", Duration.ZERO).toString())
-                .location(URI.create(target))
-                .build();
+                .contentType(MediaType.TEXT_HTML)
+                .body(body);
     }
 
     /** L'app scambia il codice usa-e-getta con access token + refresh token (back-channel HTTPS). */
