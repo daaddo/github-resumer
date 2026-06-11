@@ -6,6 +6,7 @@ import it.davidecascella.githubresumer.client.dto.GitHubTokenResponse;
 import it.davidecascella.githubresumer.client.dto.GitHubUser;
 import it.davidecascella.githubresumer.config.GitHubProperties;
 import it.davidecascella.githubresumer.domain.User;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -15,6 +16,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /** Orchestrazione del flusso OAuth di GitHub. */
+@Slf4j
 @Service
 public class GitHubOAuthService {
 
@@ -127,11 +129,16 @@ public class GitHubOAuthService {
         String authorityAndPath = appLink.substring(scheme.length() + 3); // toglie "<scheme>://"
         String sep = appLink.contains("?") ? "&" : "?";
         String query = sep + param + "=" + enc(value);
-        return "intent://" + authorityAndPath + query
+        String fallbackUrl = appLink + query;
+        String intentUrl = "intent://" + authorityAndPath + query
                 + "#Intent;scheme=" + scheme
                 + ";package=" + properties.appPackage()
-                + ";S.browser_fallback_url=" + enc(appLink + query)
+                + ";S.browser_fallback_url=" + enc(fallbackUrl)
                 + ";end";
+        log.info("Pagina di rimbalzo all'app: appRedirectUri={}, package={}, scheme={}", appLink, properties.appPackage(), scheme);
+        log.info("URL intent generato: {}", intentUrl);
+        log.info("Browser fallback URL: {}", fallbackUrl);
+        return intentUrl;
     }
 
     private String page(String intentUrl) {

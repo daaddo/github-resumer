@@ -7,8 +7,7 @@
       "namespace": "android_app",
       "package_name": "it.davidecascella.githubresumer",
       "sha256_cert_fingerprints": [
-        "REPLACE_CON_SHA256_DEBUG",
-        "REPLACE_CON_SHA256_RELEASE"
+        "13:6E:5D:B1:89:C8:0E:73:AB:D4:EE:FD:FE:54:8C:E2:37:6C:7C:86:7A:B0:2D:F1:2F:80:10:10:67:E3:D1:37"
       ]
     }
   }
