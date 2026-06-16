@@ -2,6 +2,7 @@ package it.davidecascella.githubresumer.web;
 
 import it.davidecascella.githubresumer.service.UserService;
 import it.davidecascella.githubresumer.web.dto.FcmTokenRequest;
+import it.davidecascella.githubresumer.web.dto.OrgWithReposResponse;
 import it.davidecascella.githubresumer.web.dto.TrackRepoRequest;
 import it.davidecascella.githubresumer.web.dto.TrackedRepoResponse;
 import it.davidecascella.githubresumer.web.security.JwtAuthInterceptor;
@@ -61,5 +62,12 @@ public class MeController {
             @Valid @RequestBody TrackRepoRequest request) {
         userService.untrackRepo(userId, request.repoFullName());
         return ResponseEntity.noContent().build();
+    }
+
+    /** Organizzazioni dell'utente con i rispettivi repository */
+    @GetMapping("/github-orgs")
+    public List<OrgWithReposResponse> listGithubOrgs(
+            @RequestAttribute(JwtAuthInterceptor.USER_ID_ATTRIBUTE) Long userId) {
+        return userService.getGithubOrgsWithRepos(userId);
     }
 }

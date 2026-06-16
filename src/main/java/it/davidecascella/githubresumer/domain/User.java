@@ -43,6 +43,9 @@ public class User {
     @Column(name = "github_account_id", nullable = false, unique = true)
     private Long githubAccountId;
 
+    @Column(name = "github_access_token", length = 512)
+    private String githubAccessToken;
+
     /** Token FCM del dispositivo; può essere null finché il client non lo registra. */
     @Column(name = "fcm_token", length = 512)
     private String fcmToken;

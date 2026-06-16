@@ -49,7 +49,7 @@ public class GitHubOAuthService {
         return "https://github.com/login/oauth/authorize"
                 + "?client_id=" + enc(properties.clientId())
                 + "&redirect_uri=" + enc(redirectUri)
-                + "&scope=" + enc("read:user")
+                + "&scope=" + enc("read:user read:org public_repo")
                 + "&state=" + enc(state);
     }
 
@@ -73,7 +73,7 @@ public class GitHubOAuthService {
         }
 
         GitHubUser githubUser = apiClient.getAuthenticatedUser("Bearer " + token.accessToken());
-        User user = userService.upsertFromGitHub(githubUser);
+        User user = userService.upsertFromGitHub(githubUser, token.accessToken());
         return authCodeService.issue(user.getId(), codeChallenge);
     }
 
