@@ -1,11 +1,14 @@
 package it.davidecascella.githubresumer.web;
 
+import feign.FeignException;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
@@ -15,7 +18,8 @@ import java.util.Map;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, String>> handleValidation(MethodArgumentNotValidException ex) {
+    public ResponseEntity<Map<String, String>> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request  ) {
+        log.info("Metodo non valido chiamato a: ",request.getRequestURI());
         String message = ex.getBindingResult().getFieldErrors().stream()
                 .findFirst()
                 .map(e -> e.getField() + ": " + e.getDefaultMessage())
@@ -32,6 +36,23 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleResponseStatus(ResponseStatusException ex) {
         String message = ex.getReason() != null ? ex.getReason() : "Richiesta non valida";
         return ResponseEntity.status(ex.getStatusCode()).body(Map.of("error", message));
+    }
+
+    /**
+     * Errori provenienti dalle chiamate alle API di GitHub (client Feign).
+     * Logghiamo status, metodo, URL e corpo della risposta di GitHub per la diagnosi,
+     * ma verso il client esponiamo un 500 generico (non propaghiamo lo status di GitHub).
+     */
+    @ExceptionHandler(FeignException.class)
+    public ResponseEntity<Map<String, String>> handleFeign(FeignException ex) {
+        log.error("Chiamata a GitHub fallita: status={} method={} url={} body={}",
+                ex.status(),
+                ex.request() != null ? ex.request().httpMethod() : "n/d",
+                ex.request() != null ? ex.request().url() : "n/d",
+                ex.contentUTF8(),
+                ex);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", "Errore nella comunicazione con GitHub"));
     }
 
     @ExceptionHandler(Exception.class)

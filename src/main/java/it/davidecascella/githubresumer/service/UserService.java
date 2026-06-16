@@ -9,6 +9,8 @@ import it.davidecascella.githubresumer.domain.User;
 import it.davidecascella.githubresumer.repository.TrackedRepositoryRepository;
 import it.davidecascella.githubresumer.repository.UserRepository;
 import it.davidecascella.githubresumer.web.dto.OrgWithReposResponse;
+import feign.FeignException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 @Service
 public class UserService {
 
@@ -51,7 +54,8 @@ public class UserService {
 
     public User getById(Long id) {
         return userRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Utente non trovato: " + id));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                        "Sessione non più valida: effettua nuovamente il login."));
     }
 
     @Transactional
@@ -94,12 +98,24 @@ public class UserService {
 
         List<GitHubOrg> orgs = fetchAllPages(
                 (page) -> gitHubApiClient.getUserOrgs(bearer, PAGE_SIZE, page));
+        log.info("Utente {}: GitHub ha restituito {} organizzazioni.", userId, orgs.size());
 
         List<OrgWithReposResponse> result = new ArrayList<>();
         for (GitHubOrg org : orgs) {
-            List<GitHubRepo> repos = fetchAllPages(
-                    (page) -> gitHubApiClient.getOrgRepos(org.login(), bearer, PAGE_SIZE, page, "all"));
-            result.add(OrgWithReposResponse.from(org, repos));
+            try {
+                List<GitHubRepo> repos = fetchAllPages(
+                        (page) -> gitHubApiClient.getOrgRepos(org.login(), bearer, PAGE_SIZE, page, "all"));
+                result.add(OrgWithReposResponse.from(org, repos));
+            } catch (FeignException.NotFound e) {
+                // L'org compare in /user/orgs ma i suoi repo non sono elencabili con questo token:
+                // tipicamente l'organizzazione non ha approvato l'OAuth app (third-party access
+                // restriction), e GitHub risponde 404 invece di 403. La includo senza repository
+                // anziché far fallire l'intera richiesta.
+                log.warn("Repos dell'org '{}' non accessibili (GitHub 404) per l'utente {}: " +
+                        "la includo senza repository (probabile restrizione OAuth app lato org).",
+                        org.login(), userId);
+                result.add(OrgWithReposResponse.from(org, List.of()));
+            }
         }
         return result;
     }
