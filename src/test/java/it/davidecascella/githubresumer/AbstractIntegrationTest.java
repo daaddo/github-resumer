@@ -32,5 +32,7 @@ public abstract class AbstractIntegrationTest {
         registry.add("app.jwt.secret", () -> "test-jwt-secret-almeno-32-caratteri-123456");
         // Firebase e Anthropic restano disattivati/vuoti: i bean partono in modalità fallback.
         registry.add("firebase.enabled", () -> "false");
+        // Chiave AES-256 fittizia per i test (32 byte in Base64).
+        registry.add("app.encryption.secret-key", () -> "5YoT6HURdwnKgV3mMgofsP+F4Uu7SIDtTvm/ZvCNV9k=");
     }
 }
