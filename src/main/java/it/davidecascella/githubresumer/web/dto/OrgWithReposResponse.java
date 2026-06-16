@@ -7,6 +7,7 @@ import java.util.List;
 
 public record OrgWithReposResponse(
         String login,
+        String name,
         String avatarUrl,
         String description,
         List<RepoSummary> repos
@@ -36,6 +37,7 @@ public record OrgWithReposResponse(
     public static OrgWithReposResponse from(GitHubOrg org, List<GitHubRepo> repos) {
         return new OrgWithReposResponse(
                 org.login(),
+                org.name(),
                 org.avatarUrl(),
                 org.description(),
                 repos.stream().map(RepoSummary::from).toList()
