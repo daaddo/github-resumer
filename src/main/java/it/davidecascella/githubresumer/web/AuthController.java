@@ -85,8 +85,7 @@ public class AuthController {
      * Callback chiamata da GitHub. Verifica lo state, gestisce il rifiuto/gli errori e i fallimenti
      * di login, e in OGNI caso restituisce una pagina HTML che rimbalza all'app (con ?code=... o
      * ?error=...): così l'app non resta mai bloccata nel browser. La pagina riapre l'app tramite
-     * custom scheme (githubresumer://auth/callback), che dalla Custom Tab viene consegnato all'app
-     * senza il blocco anti-loop dell'intent://. Il cookie di state viene sempre ripulito.
+     * App Link https verificato (assetlinks.json). Il cookie di state viene sempre ripulito.
      */
     @GetMapping("/github/callback")
     public ResponseEntity<String> callback(
@@ -145,7 +144,7 @@ public class AuthController {
     /**
      * Gestisce il ritorno dopo "Install & Authorize": identifica l'utente dal code OAuth ricevuto
      * durante l'installazione, traccia i repo dell'installazione e produce la pagina HTML che rimbalza
-     * all'app via custom scheme (githubresumer://...?installed=true&count=N).
+     * all'app via App Link https (…/app/callback?installed=true&count=N).
      */
     private String buildInstallResult(String code, Long installationId) {
         if (code == null || code.isBlank()) {

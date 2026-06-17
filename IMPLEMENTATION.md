@@ -6,10 +6,12 @@ verso l'app Android/Wear OS, riassumendo i commit con **Claude**.
 ## Architettura
 
 ```
-Android ──login──▶ /auth/github/login ──▶ GitHub OAuth ──▶ /auth/github/callback
-                                                              │ upsert User + JWT
-                                                              ▼
-                                              deep link  githubresumer://auth?token=<JWT>
+Android ──login (PKCE)──▶ /auth/github/login ──▶ GitHub OAuth ──▶ /auth/github/callback
+                                                                    │ upsert User + codice usa-e-getta
+                                                                    ▼
+                            App Link  https://api.resumer.davidecascella.it/app/callback?code=<one-time>
+                                                                    │
+Android ──code + code_verifier──▶ POST /auth/exchange ──▶ access token (JWT) + refresh token
 
 Android ──Bearer JWT──▶ /api/me/fcm-token            (registra token FCM)
 Android ──Bearer JWT──▶ /api/me/tracked-repos        (CRUD repo tracciati)
@@ -68,9 +70,12 @@ GitHub ──push webhook──▶ /webhooks/github
 
 | Metodo | Path | Auth | Descrizione |
 |--------|------|------|-------------|
-| GET | `/auth/github/login` | no | Redirect a GitHub per il login OAuth |
-| GET | `/auth/github/callback` | no | Callback OAuth → redirect deep link con JWT |
-| POST | `/webhooks/github` | firma HMAC | Riceve gli eventi della GitHub App |
+| GET | `/auth/github/login` | no | Avvia il login OAuth (PKCE): redirect a GitHub |
+| GET | `/auth/github/callback` | no | Callback OAuth e ritorno post-install → pagina HTML che rimbalza all'app (App Link) col codice usa-e-getta |
+| POST | `/auth/exchange` | no | Scambia il codice usa-e-getta (+ code_verifier PKCE) con access token + refresh token |
+| POST | `/auth/refresh` | no | Ruota il refresh token ed emette un nuovo access token |
+| POST | `/auth/logout` | no | Revoca il refresh token |
+| POST | `/webhooks/github` | firma HMAC | Riceve gli eventi della GitHub App (push, installation, installation_repositories) |
 | PUT | `/api/me/fcm-token` | Bearer JWT | Registra/aggiorna il token FCM |
 | GET | `/api/me/tracked-repos` | Bearer JWT | Lista repo tracciati |
 | POST | `/api/me/tracked-repos` | Bearer JWT | Aggiunge un repo (`{"repoFullName":"owner/repo"}`) |
@@ -80,8 +85,10 @@ GitHub ──push webhook──▶ /webhooks/github
 
 Per integrare l'app col backend:
 1. **Client Retrofit verso il backend** (nuova base URL, non più solo `api.github.com`).
-2. **Login OAuth**: apri `/auth/github/login` in una Custom Tab; gestisci il deep link
-   `githubresumer://auth?token=<JWT>` (intent-filter nel Manifest) e salva il JWT in DataStore.
+2. **Login OAuth (PKCE)**: apri `/auth/github/login` in una Custom Tab; gestisci l'App Link
+   `https://api.resumer.davidecascella.it/app/callback?code=<one-time>` (intent-filter `autoVerify`
+   nel Manifest + assetlinks.json) e scambia il codice via `POST /auth/exchange` (con `code_verifier`)
+   per ottenere access + refresh token, da salvare cifrati in DataStore.
 3. **FCM**: aggiungi Firebase all'app (`google-services.json`), ottieni il token con
    `FirebaseMessaging.getInstance().token` e fai `PUT /api/me/fcm-token` con header `Authorization: Bearer <JWT>`.
 4. **Repo tracciati**: sostituisci il salvataggio locale dei repo con le chiamate a `/api/me/tracked-repos`.

@@ -125,9 +125,8 @@ public class GitHubOAuthService {
 
     /**
      * Pagina HTML che rimbalza il codice usa-e-getta all'app Android dopo il callback OAuth.
-     * Il ritorno usa un custom scheme (es. githubresumer://auth/callback): dalla Custom Tab l'OS
-     * consegna l'URL all'app che possiede l'intent-filter. Evita l'intent://...;package=<app stessa>,
-     * che dentro una Custom Tab veniva bloccato (anti-loop) e degradava nel Play Store (market://).
+     * Il ritorno usa un App Link https verificato (vedi appRedirectUri): l'OS lo consegna all'app
+     * grazie all'intent-filter autoVerify + assetlinks.json.
      */
     public String buildAppRedirectPage(String oneTimeCode) {
         return page(appUrl("code", oneTimeCode));
@@ -147,7 +146,7 @@ public class GitHubOAuthService {
         return page(url);
     }
 
-    /** Costruisce l'URL custom-scheme che riapre l'app col codice usa-e-getta (o con l'errore). */
+    /** Costruisce l'URL (App Link https) che riapre l'app col codice usa-e-getta (o con l'errore). */
     private String appUrl(String param, String value) {
         String base = properties.appRedirectUri();
         String sep = base.contains("?") ? "&" : "?";
