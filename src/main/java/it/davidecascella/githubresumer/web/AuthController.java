@@ -93,8 +93,22 @@ public class AuthController {
             @RequestParam(value = "code", required = false) String code,
             @RequestParam(value = "state", required = false) String state,
             @RequestParam(value = "error", required = false) String error,
+            @RequestParam(value = "installation_id", required = false) Long installationId,
+            @RequestParam(value = "setup_action", required = false) String setupAction,
             @CookieValue(value = STATE_COOKIE, required = false) String expectedState,
             @CookieValue(value = CHALLENGE_COOKIE, required = false) String codeChallenge) {
+
+        // Flusso di INSTALLAZIONE: con "OAuth during installation" attivo la Setup URL è disabilitata,
+        // quindi GitHub reindirizza QUI con installation_id (senza passare da /github/login, dunque
+        // senza cookie PKCE/state). Lo riconosciamo dalla presenza di installation_id.
+        if (installationId != null) {
+            log.info("Callback con installation_id={}, setup_action={}: flusso di installazione",
+                    installationId, setupAction);
+            return ResponseEntity.ok()
+                    .contentType(MediaType.TEXT_HTML)
+                    .body(buildInstallResult(code, installationId));
+        }
+
         log.info("Callback OAuth ricevuta: code presente={}, error={}, challenge presente={}",
                 code != null && !code.isBlank(), error, codeChallenge != null && !codeChallenge.isBlank());
 
@@ -129,40 +143,23 @@ public class AuthController {
     }
 
     /**
-     * "Setup URL" della GitHub App: GitHub reindirizza qui dopo "Install & Authorize".
-     * Riceve installation_id + setup_action e, grazie all'autorizzazione utente durante l'installazione,
-     * anche un code OAuth. Identifica l'utente dal code, traccia i repo dell'installazione e rimbalza
-     * all'app via custom scheme (githubresumer://...?installed=true&count=N), così non resta nel browser.
+     * Gestisce il ritorno dopo "Install & Authorize": identifica l'utente dal code OAuth ricevuto
+     * durante l'installazione, traccia i repo dell'installazione e produce la pagina HTML che rimbalza
+     * all'app via custom scheme (githubresumer://...?installed=true&count=N).
      */
-    @GetMapping("/github/setup")
-    public ResponseEntity<String> setup(
-            @RequestParam(value = "code", required = false) String code,
-            @RequestParam(value = "installation_id", required = false) Long installationId,
-            @RequestParam(value = "setup_action", required = false) String setupAction) {
-        log.info("Setup installazione: installation_id={}, setup_action={}, code presente={}",
-                installationId, setupAction, code != null && !code.isBlank());
-
-        String body;
-        if (installationId == null) {
-            log.warn("Setup senza installation_id");
-            body = oAuthService.buildAppErrorPage("missing_installation_id");
-        } else if (code == null || code.isBlank()) {
-            log.warn("Setup senza code: verificare che 'Request user authorization (OAuth) during installation' sia attivo");
-            body = oAuthService.buildAppErrorPage("missing_code");
-        } else {
-            try {
-                int count = installationService.linkInstallation(code, installationId);
-                log.info("Installazione completata: {} repo tracciati, rimbalzo all'app", count);
-                body = oAuthService.buildAppInstalledPage(count);
-            } catch (Exception e) {
-                log.warn("Setup installazione fallito", e);
-                body = oAuthService.buildAppErrorPage("install_failed");
-            }
+    private String buildInstallResult(String code, Long installationId) {
+        if (code == null || code.isBlank()) {
+            log.warn("Installazione senza code: verificare che 'Request user authorization (OAuth) during installation' sia attivo");
+            return oAuthService.buildAppErrorPage("missing_code");
         }
-
-        return ResponseEntity.ok()
-                .contentType(MediaType.TEXT_HTML)
-                .body(body);
+        try {
+            int count = installationService.linkInstallation(code, installationId);
+            log.info("Installazione completata: {} repo tracciati, rimbalzo all'app", count);
+            return oAuthService.buildAppInstalledPage(count);
+        } catch (Exception e) {
+            log.warn("Installazione fallita", e);
+            return oAuthService.buildAppErrorPage("install_failed");
+        }
     }
 
     /** L'app scambia il codice usa-e-getta con access token + refresh token (back-channel HTTPS). */

@@ -60,6 +60,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
+        <!-- AOP: spring-aspects porta aspectjweaver e abilita l'auto-proxy AspectJ (logging via @Aspect) -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-aspects</artifactId>
+        </dependency>
 
         <!-- Firebase Admin SDK: invio notifiche push FCM -->
         <dependency>

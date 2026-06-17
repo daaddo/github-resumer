@@ -35,6 +35,7 @@ public class WebhookController {
             @RequestHeader(value = "X-Hub-Signature-256", required = false) String signature,
             @RequestBody byte[] rawBody) {
 
+        log.info("received event {}", event);
         // Firma assente/errata = chiamata non proveniente da GitHub: rifiutiamo (non causa sospensione).
         if (!signatureVerifier.isValid(rawBody, signature)) {
             log.warn("Webhook con firma non valida: respinto.");
