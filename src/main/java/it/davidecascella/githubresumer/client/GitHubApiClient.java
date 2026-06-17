@@ -43,10 +43,25 @@ public interface GitHubApiClient {
     /**
      * Repository accessibili a una installazione della GitHub App (pubblici e privati inclusi
      * nell'installazione). Richiede un installation access token come Bearer.
+     * NB: bypassa i controlli a livello utente -> usare SOLO server-to-server (es. webhook),
+     * mai per fidarsi di un installation_id fornito da un client.
      */
     @GetMapping("/installation/repositories")
     InstallationRepositoriesResponse getInstallationRepositories(
             @RequestHeader("Authorization") String bearerInstallationToken,
+            @RequestParam("per_page") int perPage,
+            @RequestParam("page") int page
+    );
+
+    /**
+     * Repository di una specifica installazione ACCESSIBILI all'utente autenticato (user-to-server
+     * token). Ritorna i repo solo se l'utente ha davvero accesso a quell'installazione, altrimenti 404:
+     * è così che verifichiamo la proprietà dell'installation_id (anti-IDOR).
+     */
+    @GetMapping("/user/installations/{installationId}/repositories")
+    InstallationRepositoriesResponse getUserInstallationRepositories(
+            @RequestHeader("Authorization") String bearerUserToken,
+            @PathVariable("installationId") long installationId,
             @RequestParam("per_page") int perPage,
             @RequestParam("page") int page
     );

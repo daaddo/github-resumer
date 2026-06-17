@@ -58,11 +58,17 @@ public class InstallationService {
      */
     @Transactional
     public int linkInstallation(String code, long installationId) {
-        User user = oAuthService.authenticateUserFromCode(code);
-        upsertInstallation(installationId, user.getId(), null, null);
-        int count = reconcile(installationId, user.getId());
+        AuthenticatedGitHubUser auth = oAuthService.authenticateUserFromCode(code);
+        Long userId = auth.user().getId();
+
+        // ANTI-IDOR: elenchiamo con il token UTENTE. Se l'utente non ha accesso a questa
+        // installazione, GitHub risponde 404 e qui non leghiamo nulla (niente accesso ai repo altrui).
+        Set<String> repos = fetchUserInstallationRepoNames(auth.accessToken(), installationId);
+
+        upsertInstallation(installationId, userId, null, null);
+        int count = reconcileWith(installationId, userId, repos);
         log.info("Installazione {} collegata all'utente {}: {} repo tracciati.",
-                installationId, user.getId(), count);
+                installationId, userId, count);
         return count;
     }
 
@@ -84,7 +90,10 @@ public class InstallationService {
             inst.setAccountLogin(accountLogin);
         }
         installationRepository.save(inst);
-        int count = reconcile(installationId, inst.getUserId());
+        // Webhook: nessun token utente disponibile. Usiamo l'installation token (server-to-server):
+        // è sicuro perché la mappa installation_id -> utente è stata verificata al setup.
+        Set<String> repos = fetchInstallationRepoNames(installationId);
+        int count = reconcileWith(installationId, inst.getUserId(), repos);
         log.info("Installazione {} riconciliata (utente {}): {} repo tracciati.",
                 installationId, inst.getUserId(), count);
     }
@@ -121,9 +130,7 @@ public class InstallationService {
      * Allinea i tracked repo con installation_id = installationId allo stato corrente su GitHub:
      * aggiunge i nuovi, rimuove quelli non più presenti. Ritorna il numero di repo correnti.
      */
-    private int reconcile(long installationId, Long userId) {
-        Set<String> current = fetchInstallationRepoNames(installationId);
-
+    private int reconcileWith(long installationId, Long userId, Set<String> current) {
         List<TrackedRepository> existing = trackedRepositoryRepository.findByInstallationId(installationId);
         Set<String> existingNames = new HashSet<>();
         for (TrackedRepository t : existing) {
@@ -152,6 +159,7 @@ public class InstallationService {
         return current.size();
     }
 
+    /** Repo dell'installazione via installation token (server-to-server): usare solo dai webhook. */
     private Set<String> fetchInstallationRepoNames(long installationId) {
         String bearer = "Bearer " + gitHubAppService.getInstallationToken(installationId);
         Set<String> names = new HashSet<>();
@@ -159,6 +167,28 @@ public class InstallationService {
         while (true) {
             InstallationRepositoriesResponse resp =
                     gitHubApiClient.getInstallationRepositories(bearer, PAGE_SIZE, page++);
+            for (GitHubRepo repo : resp.repositories()) {
+                names.add(repo.fullName());
+            }
+            if (resp.repositories().size() < PAGE_SIZE) {
+                break;
+            }
+        }
+        return names;
+    }
+
+    /**
+     * Repo dell'installazione via token UTENTE: ritorna i repo solo se l'utente ha accesso a
+     * quell'installazione (altrimenti GitHub risponde 404). Usato al setup per verificare la
+     * proprietà dell'installation_id ed evitare accessi a installazioni altrui.
+     */
+    private Set<String> fetchUserInstallationRepoNames(String userAccessToken, long installationId) {
+        String bearer = "Bearer " + userAccessToken;
+        Set<String> names = new HashSet<>();
+        int page = 1;
+        while (true) {
+            InstallationRepositoriesResponse resp =
+                    gitHubApiClient.getUserInstallationRepositories(bearer, installationId, PAGE_SIZE, page++);
             for (GitHubRepo repo : resp.repositories()) {
                 names.add(repo.fullName());
             }

@@ -82,7 +82,7 @@ public class GitHubOAuthService {
      * ("Install & Authorize"): scambia il code, recupera il profilo GitHub e fa upsert dell'utente.
      * Non emette sessione: serve solo a sapere CHI sta installando, per legargli i repo.
      */
-    public User authenticateUserFromCode(String code) {
+    public AuthenticatedGitHubUser authenticateUserFromCode(String code) {
         Map<String, String> body = new HashMap<>();
         body.put("client_id", properties.clientId());
         body.put("client_secret", properties.clientSecret());
@@ -94,7 +94,8 @@ public class GitHubOAuthService {
                     + (token.error() != null ? token.error() : "nessun access_token"));
         }
         GitHubUser githubUser = apiClient.getAuthenticatedUser("Bearer " + token.accessToken());
-        return userService.upsertFromGitHub(githubUser, token.accessToken());
+        User user = userService.upsertFromGitHub(githubUser, token.accessToken());
+        return new AuthenticatedGitHubUser(user, token.accessToken());
     }
 
     /**
