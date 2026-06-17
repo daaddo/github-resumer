@@ -1,6 +1,7 @@
 package it.davidecascella.githubresumer.web;
 
 import it.davidecascella.githubresumer.service.GitHubOAuthService;
+import it.davidecascella.githubresumer.service.InstallationService;
 import it.davidecascella.githubresumer.service.SessionTokens;
 import it.davidecascella.githubresumer.web.dto.ExchangeRequest;
 import it.davidecascella.githubresumer.web.dto.RefreshRequest;
@@ -47,9 +48,11 @@ public class AuthController {
     private static final Pattern CHALLENGE_PATTERN = Pattern.compile("[A-Za-z0-9\\-_]{43}");
 
     private final GitHubOAuthService oAuthService;
+    private final InstallationService installationService;
 
-    public AuthController(GitHubOAuthService oAuthService) {
+    public AuthController(GitHubOAuthService oAuthService, InstallationService installationService) {
         this.oAuthService = oAuthService;
+        this.installationService = installationService;
     }
 
     /**
@@ -121,6 +124,43 @@ public class AuthController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie(STATE_COOKIE, "", Duration.ZERO).toString())
                 .header(HttpHeaders.SET_COOKIE, cookie(CHALLENGE_COOKIE, "", Duration.ZERO).toString())
+                .contentType(MediaType.TEXT_HTML)
+                .body(body);
+    }
+
+    /**
+     * "Setup URL" della GitHub App: GitHub reindirizza qui dopo "Install & Authorize".
+     * Riceve installation_id + setup_action e, grazie all'autorizzazione utente durante l'installazione,
+     * anche un code OAuth. Identifica l'utente dal code, traccia i repo dell'installazione e rimbalza
+     * all'app via custom scheme (githubresumer://...?installed=true&count=N), così non resta nel browser.
+     */
+    @GetMapping("/github/setup")
+    public ResponseEntity<String> setup(
+            @RequestParam(value = "code", required = false) String code,
+            @RequestParam(value = "installation_id", required = false) Long installationId,
+            @RequestParam(value = "setup_action", required = false) String setupAction) {
+        log.info("Setup installazione: installation_id={}, setup_action={}, code presente={}",
+                installationId, setupAction, code != null && !code.isBlank());
+
+        String body;
+        if (installationId == null) {
+            log.warn("Setup senza installation_id");
+            body = oAuthService.buildAppErrorPage("missing_installation_id");
+        } else if (code == null || code.isBlank()) {
+            log.warn("Setup senza code: verificare che 'Request user authorization (OAuth) during installation' sia attivo");
+            body = oAuthService.buildAppErrorPage("missing_code");
+        } else {
+            try {
+                int count = installationService.linkInstallation(code, installationId);
+                log.info("Installazione completata: {} repo tracciati, rimbalzo all'app", count);
+                body = oAuthService.buildAppInstalledPage(count);
+            } catch (Exception e) {
+                log.warn("Setup installazione fallito", e);
+                body = oAuthService.buildAppErrorPage("install_failed");
+            }
+        }
+
+        return ResponseEntity.ok()
                 .contentType(MediaType.TEXT_HTML)
                 .body(body);
     }

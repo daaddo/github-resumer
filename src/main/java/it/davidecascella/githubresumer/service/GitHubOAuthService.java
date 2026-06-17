@@ -78,6 +78,26 @@ public class GitHubOAuthService {
     }
 
     /**
+     * Identifica l'utente a partire dal code OAuth ricevuto durante l'installazione della GitHub App
+     * ("Install & Authorize"): scambia il code, recupera il profilo GitHub e fa upsert dell'utente.
+     * Non emette sessione: serve solo a sapere CHI sta installando, per legargli i repo.
+     */
+    public User authenticateUserFromCode(String code) {
+        Map<String, String> body = new HashMap<>();
+        body.put("client_id", properties.clientId());
+        body.put("client_secret", properties.clientSecret());
+        body.put("code", code);
+
+        GitHubTokenResponse token = oAuthClient.exchangeCodeForToken(body);
+        if (token.accessToken() == null || token.accessToken().isBlank()) {
+            throw new IllegalStateException("Scambio OAuth (installazione) fallito: "
+                    + (token.error() != null ? token.error() : "nessun access_token"));
+        }
+        GitHubUser githubUser = apiClient.getAuthenticatedUser("Bearer " + token.accessToken());
+        return userService.upsertFromGitHub(githubUser, token.accessToken());
+    }
+
+    /**
      * Scambia il codice usa-e-getta con una sessione: consuma il codice (uso singolo) verificando
      * la prova PKCE (code_verifier) e, se valido, emette access token + refresh token per l'utente.
      */
@@ -115,6 +135,15 @@ public class GitHubOAuthService {
     /** Pagina HTML con un codice d'errore, così l'app non resta appesa nel browser dopo un login fallito. */
     public String buildAppErrorPage(String error) {
         return page(appUrl("error", error));
+    }
+
+    /** Pagina HTML che, dopo l'installazione della App, rimbalza all'app segnalando quanti repo sono stati tracciati. */
+    public String buildAppInstalledPage(int trackedCount) {
+        String base = properties.appRedirectUri();
+        String sep = base.contains("?") ? "&" : "?";
+        String url = base + sep + "installed=true&count=" + enc(String.valueOf(trackedCount));
+        log.info("Redirect all'app dopo installazione: url={}", url);
+        return page(url);
     }
 
     /** Costruisce l'URL custom-scheme che riapre l'app col codice usa-e-getta (o con l'errore). */

@@ -18,6 +18,9 @@ public interface TrackedRepositoryRepository extends JpaRepository<TrackedReposi
 
     Optional<TrackedRepository> findByUserIdAndRepoFullName(Long userId, String repoFullName);
 
+    /** Tracked repo provenienti da una specifica installazione (per la riconciliazione). */
+    List<TrackedRepository> findByInstallationId(Long installationId);
+
     boolean existsByUserIdAndRepoFullName(Long userId, String repoFullName);
 
     void deleteByUserIdAndRepoFullName(Long userId, String repoFullName);

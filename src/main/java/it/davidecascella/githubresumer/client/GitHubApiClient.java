@@ -3,6 +3,7 @@ package it.davidecascella.githubresumer.client;
 import it.davidecascella.githubresumer.client.dto.GitHubOrg;
 import it.davidecascella.githubresumer.client.dto.GitHubRepo;
 import it.davidecascella.githubresumer.client.dto.GitHubUser;
+import it.davidecascella.githubresumer.client.dto.InstallationRepositoriesResponse;
 import it.davidecascella.githubresumer.client.dto.InstallationTokenResponse;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,6 +38,17 @@ public interface GitHubApiClient {
             @RequestParam("per_page") int perPage,
             @RequestParam("page") int page,
             @RequestParam("type") String type
+    );
+
+    /**
+     * Repository accessibili a una installazione della GitHub App (pubblici e privati inclusi
+     * nell'installazione). Richiede un installation access token come Bearer.
+     */
+    @GetMapping("/installation/repositories")
+    InstallationRepositoriesResponse getInstallationRepositories(
+            @RequestHeader("Authorization") String bearerInstallationToken,
+            @RequestParam("per_page") int perPage,
+            @RequestParam("page") int page
     );
 
     /**

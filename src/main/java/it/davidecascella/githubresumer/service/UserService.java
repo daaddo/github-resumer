@@ -107,10 +107,6 @@ public class UserService {
                         (page) -> gitHubApiClient.getOrgRepos(org.login(), bearer, PAGE_SIZE, page, "all"));
                 result.add(OrgWithReposResponse.from(org, repos));
             } catch (FeignException.NotFound e) {
-                // L'org compare in /user/orgs ma i suoi repo non sono elencabili con questo token:
-                // tipicamente l'organizzazione non ha approvato l'OAuth app (third-party access
-                // restriction), e GitHub risponde 404 invece di 403. La includo senza repository
-                // anziché far fallire l'intera richiesta.
                 log.warn("Repos dell'org '{}' non accessibili (GitHub 404) per l'utente {}: " +
                         "la includo senza repository (probabile restrizione OAuth app lato org).",
                         org.login(), userId);

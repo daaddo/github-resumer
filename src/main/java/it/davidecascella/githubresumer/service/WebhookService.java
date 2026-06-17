@@ -4,6 +4,7 @@ import tools.jackson.databind.ObjectMapper;
 import it.davidecascella.githubresumer.domain.TrackedRepository;
 import it.davidecascella.githubresumer.domain.User;
 import it.davidecascella.githubresumer.repository.TrackedRepositoryRepository;
+import it.davidecascella.githubresumer.web.dto.InstallationEventPayload;
 import it.davidecascella.githubresumer.web.dto.PushEventPayload;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -24,15 +25,46 @@ public class WebhookService {
     private final TrackedRepositoryRepository trackedRepositoryRepository;
     private final SummarizationService summarizationService;
     private final FcmService fcmService;
+    private final InstallationService installationService;
 
     public WebhookService(ObjectMapper objectMapper,
                           TrackedRepositoryRepository trackedRepositoryRepository,
                           SummarizationService summarizationService,
-                          FcmService fcmService) {
+                          FcmService fcmService,
+                          InstallationService installationService) {
         this.objectMapper = objectMapper;
         this.trackedRepositoryRepository = trackedRepositoryRepository;
         this.summarizationService = summarizationService;
         this.fcmService = fcmService;
+        this.installationService = installationService;
+    }
+
+    /**
+     * Gestisce gli eventi "installation" e "installation_repositories" fuori dal thread della richiesta.
+     * Su "deleted" rimuove l'installazione; per ogni altra azione riconcilia i repo tracciati con
+     * lo stato corrente su GitHub (copre aggiunte, rimozioni e passaggio selected<->all).
+     */
+    @Async
+    public void handleInstallationAsync(byte[] rawPayload) {
+        try {
+            InstallationEventPayload payload = objectMapper.readValue(rawPayload, InstallationEventPayload.class);
+            if (payload.installation() == null || payload.installation().id() == null) {
+                log.debug("Evento installation senza id: ignorato.");
+                return;
+            }
+            long installationId = payload.installation().id();
+
+            if ("deleted".equals(payload.action())) {
+                installationService.removeInstallation(installationId);
+            } else {
+                String selection = payload.installation().repositorySelection();
+                String accountLogin = payload.installation().account() != null
+                        ? payload.installation().account().login() : null;
+                installationService.reconcileInstallation(installationId, selection, accountLogin);
+            }
+        } catch (Exception e) {
+            log.error("Errore nell'elaborazione dell'evento installation: {}", e.getMessage(), e);
+        }
     }
 
     /** Gestisce un evento "push" fuori dal thread della richiesta. */

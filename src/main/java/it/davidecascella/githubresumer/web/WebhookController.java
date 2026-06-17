@@ -43,6 +43,8 @@ public class WebhookController {
 
         if ("push".equals(event)) {
             webhookService.handlePushAsync(rawBody);
+        } else if ("installation".equals(event) || "installation_repositories".equals(event)) {
+            webhookService.handleInstallationAsync(rawBody);
         } else {
             // ping e ogni altro evento: accettati e ignorati.
             log.debug("Evento webhook '{}' ignorato.", event);

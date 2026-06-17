@@ -43,4 +43,8 @@ public class TrackedRepository {
     /** Es. "torvalds/linux". Coincide col campo repository.full_name del payload del webhook. */
     @Column(name = "repo_full_name", nullable = false)
     private String repoFullName;
+
+    /** Installazione che ha portato questo repo (NULL = tracciato manualmente dall'utente). */
+    @Column(name = "installation_id")
+    private Long installationId;
 }
