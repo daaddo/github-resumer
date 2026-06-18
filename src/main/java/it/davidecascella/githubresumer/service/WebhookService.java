@@ -97,7 +97,7 @@ public class WebhookService {
             }
 
             String summary = summarizationService.summarizePush(repoFullName, payload.branch(), messages);
-
+            log.info("summary : {}", summary);
             for (TrackedRepository repo : tracked) {
                 User user = repo.getUser();
                 fcmService.sendCommitSummary(user.getFcmToken(), repoFullName, summary);
