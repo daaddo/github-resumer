@@ -32,23 +32,27 @@ public class WebhookController {
     @PostMapping
     public ResponseEntity<Void> receive(
             @RequestHeader(value = "X-GitHub-Event", required = false) String event,
+            @RequestHeader(value = "X-GitHub-Delivery", required = false) String deliveryId,
             @RequestHeader(value = "X-Hub-Signature-256", required = false) String signature,
             @RequestBody byte[] rawBody) {
 
-        log.info("received event {}", event);
+        log.info("Webhook ricevuto: event={} delivery={} bytes={}", event, deliveryId, rawBody.length);
+
         // Firma assente/errata = chiamata non proveniente da GitHub: rifiutiamo (non causa sospensione).
         if (!signatureVerifier.isValid(rawBody, signature)) {
-            log.warn("Webhook con firma non valida: respinto.");
+            log.warn("Webhook con firma non valida (event={}, delivery={}): respinto.", event, deliveryId);
             return ResponseEntity.status(401).build();
         }
 
         if ("push".equals(event)) {
+            log.info("Webhook '{}' (delivery={}): inoltro a handlePushAsync.", event, deliveryId);
             webhookService.handlePushAsync(rawBody);
         } else if ("installation".equals(event) || "installation_repositories".equals(event)) {
+            log.info("Webhook '{}' (delivery={}): inoltro a handleInstallationAsync.", event, deliveryId);
             webhookService.handleInstallationAsync(rawBody);
         } else {
-            // ping e ogni altro evento: accettati e ignorati.
-            log.debug("Evento webhook '{}' ignorato.", event);
+            // ping e ogni altro evento (es. workflow_run/workflow_job): accettati e ignorati.
+            log.info("Webhook '{}' (delivery={}): nessun handler registrato, ignorato.", event, deliveryId);
         }
         return ResponseEntity.ok().build();
     }
