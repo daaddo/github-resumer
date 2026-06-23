@@ -9,6 +9,7 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record PushEventPayload(
         String ref,
+        @JsonProperty("after") String after,
         Repository repository,
         List<Commit> commits
 ) {
@@ -31,5 +32,20 @@ public record PushEventPayload(
         }
         int idx = ref.lastIndexOf('/');
         return idx >= 0 ? ref.substring(idx + 1) : ref;
+    }
+
+    /**
+     * SHA del commit di testa del push: usa il campo {@code after} (sempre presente negli eventi
+     * push), con fallback sull'ultimo commit della lista se per qualche motivo mancasse.
+     * Ritorna null solo se non c'è alcun commit identificabile.
+     */
+    public String headCommitId() {
+        if (after != null && !after.isBlank()) {
+            return after;
+        }
+        if (commits != null && !commits.isEmpty()) {
+            return commits.get(commits.size() - 1).id();
+        }
+        return null;
     }
 }

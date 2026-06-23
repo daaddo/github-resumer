@@ -1,8 +1,11 @@
 package it.davidecascella.githubresumer.web;
 
+import it.davidecascella.githubresumer.service.NotificationService;
 import it.davidecascella.githubresumer.service.UserService;
 import it.davidecascella.githubresumer.web.dto.FcmTokenRequest;
+import it.davidecascella.githubresumer.web.dto.NotificationResponse;
 import it.davidecascella.githubresumer.web.dto.OrgWithReposResponse;
+import it.davidecascella.githubresumer.web.dto.PageResponse;
 import it.davidecascella.githubresumer.web.dto.TrackRepoRequest;
 import it.davidecascella.githubresumer.web.dto.TrackedRepoResponse;
 import it.davidecascella.githubresumer.web.security.JwtAuthInterceptor;
@@ -15,6 +18,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -24,10 +28,15 @@ import java.util.List;
 @RequestMapping("/api/me")
 public class MeController {
 
-    private final UserService userService;
+    /** Limite massimo di elementi per pagina, per proteggere il DB da richieste abusive. */
+    private static final int MAX_PAGE_SIZE = 100;
 
-    public MeController(UserService userService) {
+    private final UserService userService;
+    private final NotificationService notificationService;
+
+    public MeController(UserService userService, NotificationService notificationService) {
         this.userService = userService;
+        this.notificationService = notificationService;
     }
 
     /** Registra/aggiorna il token FCM del dispositivo. */
@@ -69,5 +78,23 @@ public class MeController {
     public List<OrgWithReposResponse> listGithubOrgs(
             @RequestAttribute(JwtAuthInterceptor.USER_ID_ATTRIBUTE) Long userId) {
         return userService.getGithubOrgsWithRepos(userId);
+    }
+
+    /**
+     * Storico paginato delle notifiche dell'utente, ordinato cronologicamente (più recenti prima).
+     * Con {@code repo} (es. "torvalds/linux") filtra le notifiche di quel solo repository.
+     * {@code page} è 0-based; {@code size} è limitato a {@value #MAX_PAGE_SIZE}.
+     */
+    @GetMapping("/notifications")
+    public PageResponse<NotificationResponse> listNotifications(
+            @RequestAttribute(JwtAuthInterceptor.USER_ID_ATTRIBUTE) Long userId,
+            @RequestParam(required = false) String repo,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.clamp(size, 1, MAX_PAGE_SIZE);
+        return PageResponse.from(
+                notificationService.list(userId, repo, safePage, safeSize),
+                NotificationResponse::from);
     }
 }

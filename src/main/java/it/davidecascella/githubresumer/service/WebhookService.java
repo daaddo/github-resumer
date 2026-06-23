@@ -26,17 +26,20 @@ public class WebhookService {
     private final SummarizationService summarizationService;
     private final FcmService fcmService;
     private final InstallationService installationService;
+    private final NotificationService notificationService;
 
     public WebhookService(ObjectMapper objectMapper,
                           TrackedRepositoryRepository trackedRepositoryRepository,
                           SummarizationService summarizationService,
                           FcmService fcmService,
-                          InstallationService installationService) {
+                          InstallationService installationService,
+                          NotificationService notificationService) {
         this.objectMapper = objectMapper;
         this.trackedRepositoryRepository = trackedRepositoryRepository;
         this.summarizationService = summarizationService;
         this.fcmService = fcmService;
         this.installationService = installationService;
+        this.notificationService = notificationService;
     }
 
     /**
@@ -100,8 +103,12 @@ public class WebhookService {
 
             String summary = summarizationService.summarizePush(repoFullName, payload.branch(), messages);
             log.info("summary : {}", summary);
+            String commitId = payload.headCommitId();
             for (TrackedRepository repo : tracked) {
                 User user = repo.getUser();
+                if (commitId != null) {
+                    notificationService.record(user, repoFullName, summary, commitId);
+                }
                 fcmService.sendCommitSummary(user.getFcmToken(), repoFullName, summary);
             }
         } catch (Exception e) {
