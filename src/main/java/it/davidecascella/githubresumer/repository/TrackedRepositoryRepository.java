@@ -3,6 +3,8 @@ package it.davidecascella.githubresumer.repository;
 import it.davidecascella.githubresumer.domain.TrackedRepository;
 import it.davidecascella.githubresumer.domain.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -15,6 +17,14 @@ public interface TrackedRepositoryRepository extends JpaRepository<TrackedReposi
 
     /** Usata dal webhook per il filtro "Buttafuori": tutti gli utenti che tracciano questo repo. */
     List<TrackedRepository> findByRepoFullName(String repoFullName);
+
+    /**
+     * Come {@link #findByRepoFullName}, ma carica anche lo User nella stessa query (JOIN FETCH).
+     * Serve al webhook: gira in un thread @Async senza sessione aperta (open-in-view=false), quindi
+     * lo User va materializzato subito, altrimenti l'accesso lazy a user.fcmToken esplode.
+     */
+    @Query("select t from TrackedRepository t join fetch t.user where t.repoFullName = :repoFullName")
+    List<TrackedRepository> findByRepoFullNameFetchUser(@Param("repoFullName") String repoFullName);
 
     Optional<TrackedRepository> findByUserIdAndRepoFullName(Long userId, String repoFullName);
 
