@@ -1,5 +1,6 @@
 package it.davidecascella.githubresumer.service;
 
+import com.google.firebase.messaging.AndroidConfig;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.Message;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +44,11 @@ public class FcmService {
             Message message = Message.builder()
                     .setToken(fcmToken)
                     .putAllData(data)
+                    // Priorità alta: indispensabile per i messaggi data-only, altrimenti in Doze/background
+                    // FCM può ritardarli o non svegliare il dispositivo.
+                    .setAndroidConfig(AndroidConfig.builder()
+                            .setPriority(AndroidConfig.Priority.HIGH)
+                            .build())
                     .build();
             String id = firebaseMessaging.send(message);
             log.info("Notifica FCM inviata (id={}) per repo {}.", id, repoFullName);
