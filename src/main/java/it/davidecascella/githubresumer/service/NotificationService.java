@@ -7,9 +7,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @Service
@@ -66,6 +68,19 @@ public class NotificationService {
                     .findByUserIdAndRepoFullNameOrderByCreatedAtDescIdDesc(userId, repoFullName, pageable);
         }
         return notificationRepository.findByUserIdOrderByCreatedAtDescIdDesc(userId, pageable);
+    }
+
+    /**
+     * Elimina una notifica dell'utente. La cancellazione avviene solo se l'id della notifica
+     * appartiene all'utente; altrimenti (id inesistente o di un altro utente) risponde 404,
+     * senza rivelare se la notifica esista.
+     */
+    @Transactional
+    public void delete(Long userId, Long notificationId) {
+        long deleted = notificationRepository.deleteByIdAndUserId(notificationId, userId);
+        if (deleted == 0) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Notifica non trovata.");
+        }
     }
 
     private static String truncate(String value, int max) {

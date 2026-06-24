@@ -93,6 +93,26 @@ class NotificationRepositoryIntegrationTest extends AbstractIntegrationTest {
         assertThat(result.getContent().get(0).getCommitId()).isEqualTo(linux2.getCommitId());
     }
 
+    @Test
+    void delete_onlyRemovesNotificationOwnedByUser() {
+        User other = userRepository.save(User.builder()
+                .githubUsername("linus")
+                .githubAccountId(2048L)
+                .build());
+        Notification mine = notificationRepository.save(notification("Mia", "sha-mine"));
+        Notification theirs = notificationRepository.save(Notification.builder()
+                .user(other).repoFullName(REPO).title("Loro").commitId("sha-theirs").build());
+
+        // L'utente "other" non possiede la notifica di "user": nessuna riga cancellata.
+        assertThat(notificationRepository.deleteByIdAndUserId(mine.getId(), other.getId())).isZero();
+        assertThat(notificationRepository.existsById(mine.getId())).isTrue();
+
+        // Il proprietario la cancella: una riga rimossa, quella altrui resta intatta.
+        assertThat(notificationRepository.deleteByIdAndUserId(mine.getId(), user.getId())).isEqualTo(1);
+        assertThat(notificationRepository.existsById(mine.getId())).isFalse();
+        assertThat(notificationRepository.existsById(theirs.getId())).isTrue();
+    }
+
     private Notification notification(String title, String commitId) {
         return notification(REPO, title, commitId);
     }

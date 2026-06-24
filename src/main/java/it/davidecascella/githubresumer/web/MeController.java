@@ -13,6 +13,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestAttribute;
@@ -96,5 +97,17 @@ public class MeController {
         return PageResponse.from(
                 notificationService.list(userId, repo, safePage, safeSize),
                 NotificationResponse::from);
+    }
+
+    /**
+     * Elimina una notifica dell'utente corrente. Cancella solo se la notifica appartiene
+     * all'utente autenticato; in caso contrario risponde 404.
+     */
+    @DeleteMapping("/notifications/{id}")
+    public ResponseEntity<Void> deleteNotification(
+            @RequestAttribute(JwtAuthInterceptor.USER_ID_ATTRIBUTE) Long userId,
+            @PathVariable("id") Long id) {
+        notificationService.delete(userId, id);
+        return ResponseEntity.noContent().build();
     }
 }
