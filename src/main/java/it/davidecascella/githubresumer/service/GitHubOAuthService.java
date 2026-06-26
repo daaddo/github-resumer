@@ -26,6 +26,7 @@ public class GitHubOAuthService {
     private final JwtService jwtService;
     private final AuthCodeService authCodeService;
     private final RefreshTokenService refreshTokenService;
+    private final DeviceTokenService deviceTokenService;
 
     public GitHubOAuthService(GitHubProperties properties,
                               GitHubOAuthClient oAuthClient,
@@ -33,7 +34,8 @@ public class GitHubOAuthService {
                               UserService userService,
                               JwtService jwtService,
                               AuthCodeService authCodeService,
-                              RefreshTokenService refreshTokenService) {
+                              RefreshTokenService refreshTokenService,
+                              DeviceTokenService deviceTokenService) {
         this.properties = properties;
         this.oAuthClient = oAuthClient;
         this.apiClient = apiClient;
@@ -41,6 +43,7 @@ public class GitHubOAuthService {
         this.jwtService = jwtService;
         this.authCodeService = authCodeService;
         this.refreshTokenService = refreshTokenService;
+        this.deviceTokenService = deviceTokenService;
     }
 
     /** URL a cui reindirizzare il browser per avviare il login. */
@@ -118,9 +121,19 @@ public class GitHubOAuthService {
         return new SessionTokens(accessToken, rotated.refreshToken());
     }
 
-    /** Revoca il refresh token (logout). */
+    /** Revoca il refresh token (logout della sola sessione presentata). */
     public void logout(String refreshToken) {
         refreshTokenService.revoke(refreshToken);
+    }
+
+    /**
+     * Logout globale: chiude le sessioni dell'utente su TUTTI i dispositivi. Revoca ogni refresh
+     * token attivo e svuota il registro dei device FCM, così smette anche di arrivare ogni push
+     * finché l'utente non rifà login e ri-registra i dispositivi.
+     */
+    public void logoutEverywhere(Long userId) {
+        refreshTokenService.revokeAll(userId);
+        deviceTokenService.removeAllForUser(userId);
     }
 
     /**

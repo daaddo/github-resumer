@@ -1,5 +1,7 @@
 package it.davidecascella.githubresumer.web;
 
+import it.davidecascella.githubresumer.service.DeviceTokenService;
+import it.davidecascella.githubresumer.service.GitHubOAuthService;
 import it.davidecascella.githubresumer.service.NotificationService;
 import it.davidecascella.githubresumer.service.UserService;
 import it.davidecascella.githubresumer.web.dto.FcmTokenRequest;
@@ -34,18 +36,37 @@ public class MeController {
 
     private final UserService userService;
     private final NotificationService notificationService;
+    private final DeviceTokenService deviceTokenService;
+    private final GitHubOAuthService oAuthService;
 
-    public MeController(UserService userService, NotificationService notificationService) {
+    public MeController(UserService userService,
+                        NotificationService notificationService,
+                        DeviceTokenService deviceTokenService,
+                        GitHubOAuthService oAuthService) {
         this.userService = userService;
         this.notificationService = notificationService;
+        this.deviceTokenService = deviceTokenService;
+        this.oAuthService = oAuthService;
     }
 
-    /** Registra/aggiorna il token FCM del dispositivo. */
+    /** Registra/aggiorna il token FCM del dispositivo corrente (multi-dispositivo: uno per device). */
     @PutMapping("/fcm-token")
     public ResponseEntity<Void> updateFcmToken(
             @RequestAttribute(JwtAuthInterceptor.USER_ID_ATTRIBUTE) Long userId,
             @Valid @RequestBody FcmTokenRequest request) {
-        userService.updateFcmToken(userId, request.fcmToken());
+        deviceTokenService.register(userId, request.fcmToken());
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Logout globale: revoca le sessioni dell'utente su tutti i dispositivi e svuota i token FCM.
+     * Dopo questa chiamata ogni device dovrà rifare login; nessuna push verrà più recapitata
+     * finché i dispositivi non si ri-registrano.
+     */
+    @PostMapping("/logout-all")
+    public ResponseEntity<Void> logoutAll(
+            @RequestAttribute(JwtAuthInterceptor.USER_ID_ATTRIBUTE) Long userId) {
+        oAuthService.logoutEverywhere(userId);
         return ResponseEntity.noContent().build();
     }
 

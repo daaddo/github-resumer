@@ -27,19 +27,22 @@ public class WebhookService {
     private final FcmService fcmService;
     private final InstallationService installationService;
     private final NotificationService notificationService;
+    private final DeviceTokenService deviceTokenService;
 
     public WebhookService(ObjectMapper objectMapper,
                           TrackedRepositoryRepository trackedRepositoryRepository,
                           SummarizationService summarizationService,
                           FcmService fcmService,
                           InstallationService installationService,
-                          NotificationService notificationService) {
+                          NotificationService notificationService,
+                          DeviceTokenService deviceTokenService) {
         this.objectMapper = objectMapper;
         this.trackedRepositoryRepository = trackedRepositoryRepository;
         this.summarizationService = summarizationService;
         this.fcmService = fcmService;
         this.installationService = installationService;
         this.notificationService = notificationService;
+        this.deviceTokenService = deviceTokenService;
     }
 
     /**
@@ -109,7 +112,13 @@ public class WebhookService {
                 if (commitId != null) {
                     notificationService.record(user, repoFullName, summary, commitId);
                 }
-                fcmService.sendCommitSummary(user.getFcmToken(), repoFullName, summary);
+                // Multi-dispositivo: la notifica va a tutti i device registrati dall'utente.
+                for (String token : deviceTokenService.tokensFor(user.getId())) {
+                    if (fcmService.sendCommitSummary(token, repoFullName, summary)
+                            == FcmService.SendOutcome.INVALID_TOKEN) {
+                        deviceTokenService.remove(token);
+                    }
+                }
             }
         } catch (Exception e) {
             // Non rilanciamo: l'errore non deve mai propagarsi al webhook.

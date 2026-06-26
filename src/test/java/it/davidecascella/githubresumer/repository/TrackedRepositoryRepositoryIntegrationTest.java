@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *
  * Contesto della regressione (2026-06-23): il webhook elabora i push in un thread @Async, senza
  * sessione Hibernate aperta (in prod open-in-view=false). L'associazione TrackedRepository -> User
- * e' LAZY, quindi accedere a user.fcmToken fuori sessione lancia LazyInitializationException.
+ * e' LAZY, quindi accedere a un campo dello User fuori sessione lancia LazyInitializationException.
  * findByRepoFullNameFetchUser carica lo User nella STESSA query (JOIN FETCH) per evitarlo.
  *
  * Questi test NON sono @Transactional di proposito: cosi' la sessione si chiude tra la query del
@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class TrackedRepositoryRepositoryIntegrationTest extends AbstractIntegrationTest {
 
     private static final String REPO_FULL_NAME = "torvalds/linux";
-    private static final String FCM_TOKEN = "fcm-token-123";
+    private static final String GITHUB_USERNAME = "torvalds";
 
     @Autowired
     private TrackedRepositoryRepository trackedRepositoryRepository;
@@ -51,8 +51,8 @@ class TrackedRepositoryRepositoryIntegrationTest extends AbstractIntegrationTest
         List<TrackedRepository> tracked = trackedRepositoryRepository.findByRepoFullNameFetchUser(REPO_FULL_NAME);
 
         assertThat(tracked).hasSize(1);
-        // L'accesso allo User fuori sessione NON deve lanciare e il token deve essere quello salvato.
-        assertThat(tracked.get(0).getUser().getFcmToken()).isEqualTo(FCM_TOKEN);
+        // L'accesso allo User fuori sessione NON deve lanciare e il campo deve essere quello salvato.
+        assertThat(tracked.get(0).getUser().getGithubUsername()).isEqualTo(GITHUB_USERNAME);
     }
 
     /**
@@ -67,16 +67,15 @@ class TrackedRepositoryRepositoryIntegrationTest extends AbstractIntegrationTest
         List<TrackedRepository> tracked = trackedRepositoryRepository.findByRepoFullName(REPO_FULL_NAME);
         assertThat(tracked).hasSize(1);
 
-        assertThatThrownBy(() -> tracked.get(0).getUser().getFcmToken())
+        assertThatThrownBy(() -> tracked.get(0).getUser().getGithubUsername())
                 .isInstanceOf(LazyInitializationException.class);
     }
 
     private void seedTrackedRepoWithUser() {
         User user = userRepository.save(User.builder()
-                .githubUsername("torvalds")
+                .githubUsername(GITHUB_USERNAME)
                 .githubAccountId(1024L)
                 .githubAccessToken("gho_test_token")
-                .fcmToken(FCM_TOKEN)
                 .build());
 
         trackedRepositoryRepository.save(TrackedRepository.builder()

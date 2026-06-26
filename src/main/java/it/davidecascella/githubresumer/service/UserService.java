@@ -58,13 +58,6 @@ public class UserService {
                         "Sessione non più valida: effettua nuovamente il login."));
     }
 
-    @Transactional
-    public void updateFcmToken(Long userId, String fcmToken) {
-        User user = getById(userId);
-        user.setFcmToken(fcmToken);
-        userRepository.save(user);
-    }
-
     public List<TrackedRepository> listTrackedRepos(Long userId) {
         return trackedRepositoryRepository.findByUserId(userId);
     }

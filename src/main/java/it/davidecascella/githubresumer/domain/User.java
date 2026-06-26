@@ -20,7 +20,7 @@ import java.time.Instant;
 
 /**
  * Utente identificato tramite il login OAuth di GitHub.
- * Conserva il token FCM usato per recapitare le notifiche push al telefono Android.
+ * I token FCM per le notifiche push (uno per dispositivo) vivono nella tabella device_tokens.
  */
 @Entity
 @Table(name = "users")
@@ -45,10 +45,6 @@ public class User {
 
     @Column(name = "github_access_token", length = 512)
     private String githubAccessToken;
-
-    /** Token FCM del dispositivo; può essere null finché il client non lo registra. */
-    @Column(name = "fcm_token", length = 512)
-    private String fcmToken;
 
     @Column(name = "avatar_url", length = 512)
     private String avatarUrl;

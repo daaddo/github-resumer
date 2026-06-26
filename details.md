@@ -27,7 +27,10 @@ Implementare le entità JPA necessarie per supportare questa struttura:
     * `id` (PK)
     * `github_username` (Unique)
     * `github_account_id` (ID univoco di GitHub)
-    * `fcm_token` (Token per inviare la notifica push al telefono Android)
+* **DeviceToken:** (un record per dispositivo: supporto multi-device alle notifiche push)
+    * `id` (PK)
+    * `user_id` (FK su User)
+    * `fcm_token` (Unique — token per inviare la notifica push al device Android)
 * **TrackedRepository:**
     * `id` (PK)
     * `user_id` (FK su User)
@@ -40,4 +43,4 @@ Implementare le entità JPA necessarie per supportare questa struttura:
 
 ### Flusso A: Autenticazione e Setup (OAuth + App Installation)
 1.  Esporre endpoint per l'accesso OAuth di GitHub per identificare l'utente.
-2.  Ricevere il token FCM dal client Android e salvarlo nell'entità `User`.
+2.  Ricevere il token FCM dal client Android e salvarlo come `DeviceToken` dell'utente (uno per dispositivo).

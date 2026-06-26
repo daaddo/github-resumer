@@ -5,27 +5,37 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.MySQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Base per i test di integrazione: avvia un MySQL reale in un container.
+ * Base per i test di integrazione: avvia un MySQL reale in un container CONDIVISO da tutta la suite.
  *
- * - @ServiceConnection collega automaticamente il datasource Spring al container
- *   (niente spring.datasource.* da impostare a mano): Flyway gira le migrazioni
- *   e Hibernate valida lo schema contro un DB vero.
- * - Forniamo qui anche i segreti minimi necessari ad avviare il context (es. il JWT secret),
+ * Pattern "singleton container": il container è static e avviato UNA SOLA VOLTA in un blocco statico,
+ * volutamente SENZA @Testcontainers/@Container. Motivo del bug che questo evita: con @Container la
+ * lifecycle è per-classe (start in beforeAll, STOP in afterAll), mentre il context di @SpringBootTest
+ * viene messo in cache e riusato tra le classi di test. Risultato: dopo la prima classe il container
+ * veniva fermato e la classe successiva ne avviava uno nuovo su un'altra porta random, ma il pool
+ * Hikari del context in cache puntava ancora a quella vecchia -> "Communications link failure".
+ * Avviandolo una volta sola (lo rimuove Ryuk alla fine della JVM) il datasource resta valido per
+ * l'intera suite, sia in locale sia in CI.
+ *
+ * - @ServiceConnection collega automaticamente il datasource Spring al container (niente
+ *   spring.datasource.* da impostare a mano): Flyway gira le migrazioni e Hibernate valida lo schema.
+ * - Forniamo qui anche i segreti minimi necessari ad avviare il context (JWT secret, chiave AES),
  *   così non dipendiamo da application-local.properties (assente in CI).
  *
  * Richiede un daemon Docker attivo sulla macchina/runner.
  */
 @SpringBootTest
-@Testcontainers
 public abstract class AbstractIntegrationTest {
 
-    @Container
     @ServiceConnection
     static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.4");
+
+    static {
+        // Avvio esplicito e unico: niente @Container, così il container non viene mai fermato
+        // tra una classe di test e l'altra.
+        MYSQL.start();
+    }
 
     @DynamicPropertySource
     static void testProperties(DynamicPropertyRegistry registry) {

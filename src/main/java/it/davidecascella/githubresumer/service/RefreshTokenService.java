@@ -2,6 +2,7 @@ package it.davidecascella.githubresumer.service;
 
 import it.davidecascella.githubresumer.domain.RefreshToken;
 import it.davidecascella.githubresumer.repository.RefreshTokenRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,7 @@ import java.util.HexFormat;
  * Gestione dei refresh token: emissione, rotazione con reuse detection e revoca.
  * Il token in chiaro è restituito una sola volta; nel DB resta solo l'hash SHA-256.
  */
+@Slf4j
 @Service
 public class RefreshTokenService {
 
@@ -83,6 +85,13 @@ public class RefreshTokenService {
     public void revoke(String presented) {
         repository.findByTokenHash(sha256(presented))
                 .ifPresent(token -> repository.markRevoked(token.getId(), Instant.now()));
+    }
+
+    /** Revoca tutti i refresh token attivi dell'utente (logout globale da ogni dispositivo). */
+    @Transactional
+    public void revokeAll(Long userId) {
+        int revoked = repository.revokeAllForUser(userId, Instant.now());
+        log.info("Logout globale utente {}: {} refresh token revocati.", userId, revoked);
     }
 
     private String persistNew(Long userId, Instant now) {
