@@ -38,8 +38,9 @@ public class NotificationService {
      * in modo sequenziale dal thread @Async. Apre la propria transazione.
      */
     @Transactional
-    public void record(User recipient, String repoFullName, String title, String commitId) {
+    public void record(User recipient, String repoFullName, String title, String description, String commitId) {
         String safeTitle = truncate(title, MAX_TITLE_LENGTH);
+        String safeDescription = truncate(description, MAX_TITLE_LENGTH);
 
         if (notificationRepository.existsByUserIdAndRepoFullNameAndTitleAndCommitId(
                 recipient.getId(), repoFullName, safeTitle, commitId)) {
@@ -51,6 +52,7 @@ public class NotificationService {
                 .user(recipient)
                 .repoFullName(repoFullName)
                 .title(safeTitle)
+                .description(safeDescription)
                 .commitId(commitId)
                 .build());
     }

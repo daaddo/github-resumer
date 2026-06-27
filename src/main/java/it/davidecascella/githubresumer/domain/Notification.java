@@ -63,6 +63,14 @@ public class Notification {
     @Column(name = "title", nullable = false)
     private String title;
 
+    /**
+     * Descrizione più estesa delle modifiche (max ~450 caratteri, prodotta dall'LLM dal diff).
+     * Colonna TEXT e nullable: le notifiche storiche precedenti a questa feature non l'hanno.
+     */
+    @JdbcTypeCode(SqlTypes.LONGVARCHAR)
+    @Column(name = "description")
+    private String description;
+
     /** SHA del commit di riferimento (head del push). */
     @Column(name = "commit_id", nullable = false, length = 64)
     private String commitId;

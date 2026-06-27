@@ -1,6 +1,7 @@
 package it.davidecascella.githubresumer.service;
 
 import tools.jackson.databind.ObjectMapper;
+import it.davidecascella.githubresumer.client.GitHubApiClient;
 import it.davidecascella.githubresumer.domain.TrackedRepository;
 import it.davidecascella.githubresumer.domain.User;
 import it.davidecascella.githubresumer.repository.TrackedRepositoryRepository;
@@ -21,6 +22,9 @@ import java.util.List;
 @Service
 public class WebhookService {
 
+    /** Tetto ai caratteri di diff scaricati: protegge da diff giganti prima ancora dell'LLM. */
+    private static final int MAX_DIFF_CHARS = 60_000;
+
     private final ObjectMapper objectMapper;
     private final TrackedRepositoryRepository trackedRepositoryRepository;
     private final SummarizationService summarizationService;
@@ -28,6 +32,8 @@ public class WebhookService {
     private final InstallationService installationService;
     private final NotificationService notificationService;
     private final DeviceTokenService deviceTokenService;
+    private final GitHubAppService gitHubAppService;
+    private final GitHubApiClient gitHubApiClient;
 
     public WebhookService(ObjectMapper objectMapper,
                           TrackedRepositoryRepository trackedRepositoryRepository,
@@ -35,7 +41,9 @@ public class WebhookService {
                           FcmService fcmService,
                           InstallationService installationService,
                           NotificationService notificationService,
-                          DeviceTokenService deviceTokenService) {
+                          DeviceTokenService deviceTokenService,
+                          GitHubAppService gitHubAppService,
+                          GitHubApiClient gitHubApiClient) {
         this.objectMapper = objectMapper;
         this.trackedRepositoryRepository = trackedRepositoryRepository;
         this.summarizationService = summarizationService;
@@ -43,6 +51,8 @@ public class WebhookService {
         this.installationService = installationService;
         this.notificationService = notificationService;
         this.deviceTokenService = deviceTokenService;
+        this.gitHubAppService = gitHubAppService;
+        this.gitHubApiClient = gitHubApiClient;
     }
 
     /**
@@ -104,17 +114,21 @@ public class WebhookService {
                 return;
             }
 
-            String summary = summarizationService.summarizePush(repoFullName, payload.branch(), messages);
-            log.info("summary : {}", summary);
+            // Scarico il diff effettivo del push da GitHub: il payload del webhook non lo contiene.
+            String diff = fetchDiff(payload, repoFullName);
+
+            PushSummary summary = summarizationService.summarizePush(
+                    repoFullName, payload.branch(), diff, messages);
+            log.info("summary title='{}' descLen={}", summary.title(), summary.description().length());
             String commitId = payload.headCommitId();
             for (TrackedRepository repo : tracked) {
                 User user = repo.getUser();
                 if (commitId != null) {
-                    notificationService.record(user, repoFullName, summary, commitId);
+                    notificationService.record(user, repoFullName, summary.title(), summary.description(), commitId);
                 }
                 // Multi-dispositivo: la notifica va a tutti i device registrati dall'utente.
                 for (String token : deviceTokenService.tokensFor(user.getId())) {
-                    if (fcmService.sendCommitSummary(token, repoFullName, summary)
+                    if (fcmService.sendCommitSummary(token, repoFullName, summary.title(), summary.description())
                             == FcmService.SendOutcome.INVALID_TOKEN) {
                         deviceTokenService.remove(token);
                     }
@@ -123,6 +137,47 @@ public class WebhookService {
         } catch (Exception e) {
             // Non rilanciamo: l'errore non deve mai propagarsi al webhook.
             log.error("Errore nell'elaborazione del push: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Scarica il diff del push da GitHub via installation token. Ritorna stringa vuota (mai null,
+     * mai eccezione) se qualcosa non va: in quel caso il riassunto fa fallback sui messaggi di commit.
+     *
+     * <p>Usa la Compare API ({@code before...after}) per coprire tutti i commit del push; se non c'è
+     * un "before" valido (primo push su un branch nuovo) ripiega sul diff del solo commit di testa.
+     */
+    private String fetchDiff(PushEventPayload payload, String repoFullName) {
+        Long installationId = payload.installationId();
+        if (installationId == null) {
+            log.debug("Push su {} senza installation id: niente diff, uso il fallback.", repoFullName);
+            return "";
+        }
+        int slash = repoFullName.indexOf('/');
+        if (slash <= 0 || slash == repoFullName.length() - 1) {
+            return "";
+        }
+        String owner = repoFullName.substring(0, slash);
+        String repo = repoFullName.substring(slash + 1);
+        try {
+            String bearer = "Bearer " + gitHubAppService.getInstallationToken(installationId);
+            String before = payload.comparableBefore();
+            String head = payload.headCommitId();
+            String diff;
+            if (before != null && head != null) {
+                diff = gitHubApiClient.compareDiff(owner, repo, before + "..." + head, bearer);
+            } else if (head != null) {
+                diff = gitHubApiClient.commitDiff(owner, repo, head, bearer);
+            } else {
+                return "";
+            }
+            if (diff == null) {
+                return "";
+            }
+            return diff.length() > MAX_DIFF_CHARS ? diff.substring(0, MAX_DIFF_CHARS) : diff;
+        } catch (Exception e) {
+            log.error("Impossibile scaricare il diff di {}: {}", repoFullName, e.getMessage());
+            return "";
         }
     }
 }

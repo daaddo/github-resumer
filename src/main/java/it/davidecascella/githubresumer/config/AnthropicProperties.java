@@ -25,7 +25,7 @@ public record AnthropicProperties(
             version = "2023-06-01";
         }
         if (maxTokens == null || maxTokens <= 0) {
-            maxTokens = 256;
+            maxTokens = 512;
         }
     }
 }

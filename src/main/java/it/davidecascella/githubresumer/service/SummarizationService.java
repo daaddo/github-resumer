@@ -2,16 +2,20 @@ package it.davidecascella.githubresumer.service;
 
 import java.util.List;
 
-/** Astrazione del riassunto dei commit, così il provider LLM è intercambiabile. */
+/** Astrazione del riassunto di un push, così il provider LLM è intercambiabile. */
 public interface SummarizationService {
 
     /**
-     * Produce un riassunto compatto (1-2 frasi) adatto a una notifica su smartwatch.
+     * Produce un titolo e una descrizione delle modifiche, analizzando il diff del push
+     * (non i messaggi di commit). Non deve mai lanciare eccezioni: in caso di problemi
+     * fa fallback su un riassunto grezzo basato sui messaggi di commit.
      *
-     * @param repoFullName    es. "torvalds/linux"
-     * @param branch          ramo del push (es. "main")
-     * @param commitMessages  messaggi dei commit del push
-     * @return testo breve del riassunto
+     * @param repoFullName             es. "torvalds/linux"
+     * @param branch                   ramo del push (es. "main")
+     * @param diff                     diff unificato del push (può essere vuoto se non recuperabile)
+     * @param commitMessagesForFallback messaggi dei commit, usati SOLO per il fallback senza LLM
+     * @return titolo (max 150) e descrizione (max 450)
      */
-    String summarizePush(String repoFullName, String branch, List<String> commitMessages);
+    PushSummary summarizePush(String repoFullName, String branch, String diff,
+                              List<String> commitMessagesForFallback);
 }

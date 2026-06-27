@@ -75,4 +75,30 @@ public interface GitHubApiClient {
             @PathVariable("installationId") long installationId,
             @RequestHeader("Authorization") String bearerAppJwt
     );
+
+    /**
+     * Diff unificato fra due commit/ref ({@code base...head}) come testo grezzo.
+     * Header Accept "application/vnd.github.diff" -> GitHub risponde con il diff testuale (non JSON).
+     *
+     * @param basehead es. "<beforeSha>...<afterSha>"
+     */
+    @GetMapping(value = "/repos/{owner}/{repo}/compare/{basehead}", produces = "application/vnd.github.diff")
+    String compareDiff(
+            @PathVariable("owner") String owner,
+            @PathVariable("repo") String repo,
+            @PathVariable("basehead") String basehead,
+            @RequestHeader("Authorization") String bearerInstallationToken
+    );
+
+    /**
+     * Diff unificato di un singolo commit come testo grezzo. Usato quando non c'è un "before"
+     * con cui confrontare (es. primo push su un branch appena creato).
+     */
+    @GetMapping(value = "/repos/{owner}/{repo}/commits/{ref}", produces = "application/vnd.github.diff")
+    String commitDiff(
+            @PathVariable("owner") String owner,
+            @PathVariable("repo") String repo,
+            @PathVariable("ref") String ref,
+            @RequestHeader("Authorization") String bearerInstallationToken
+    );
 }

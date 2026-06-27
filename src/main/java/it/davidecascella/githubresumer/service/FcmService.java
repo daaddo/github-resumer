@@ -35,19 +35,26 @@ public class FcmService {
         this.firebaseMessaging = firebaseMessaging;
     }
 
-    public SendOutcome sendCommitSummary(String fcmToken, String repoFullName, String summary) {
+    public SendOutcome sendCommitSummary(String fcmToken, String repoFullName, String title, String description) {
         if (fcmToken == null || fcmToken.isBlank()) {
             log.debug("Nessun token FCM per il repo {}: notifica saltata.", repoFullName);
             return SendOutcome.SKIPPED;
         }
+        // FCM rifiuta valori null nei data: normalizziamo a stringa vuota.
+        String safeTitle = title == null ? "" : title;
+        String safeDescription = description == null ? "" : description;
         Map<String, String> data = Map.of(
                 "type", "commit_summary",
                 "repo", repoFullName,
-                "summary", summary
+                "title", safeTitle,
+                "description", safeDescription,
+                // Ponte di compatibilità: i client che leggono ancora "summary" continuano a funzionare.
+                "summary", safeTitle
         );
 
         if (firebaseMessaging == null) {
-            log.info("[FCM log-only] token={} repo={} summary={}", mask(fcmToken), repoFullName, summary);
+            log.info("[FCM log-only] token={} repo={} title={} descLen={}",
+                    mask(fcmToken), repoFullName, safeTitle, safeDescription.length());
             return SendOutcome.SKIPPED;
         }
         try {
