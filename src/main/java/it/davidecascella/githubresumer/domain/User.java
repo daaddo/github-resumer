@@ -2,6 +2,8 @@ package it.davidecascella.githubresumer.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -48,6 +50,12 @@ public class User {
 
     @Column(name = "avatar_url", length = 512)
     private String avatarUrl;
+
+    /** Ruolo applicativo. Nuovi utenti: ROLE_USER; gli admin si promuovono a mano via DB. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false, length = 20)
+    @Builder.Default
+    private Role role = Role.ROLE_USER;
 
     @CreatedDate
     @Column(name = "created_at", updatable = false)

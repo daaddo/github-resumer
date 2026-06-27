@@ -56,6 +56,37 @@ public class GitHubOAuthService {
                 + "&state=" + enc(state);
     }
 
+    /** URL authorize per il login WEB del pannello admin (redirect_uri dedicata, scope minimo). */
+    public String buildWebAuthorizeUrl(String state) {
+        String redirectUri = properties.callbackBaseUrl() + "/admin/oauth/callback";
+        return "https://github.com/login/oauth/authorize"
+                + "?client_id=" + enc(properties.clientId())
+                + "&redirect_uri=" + enc(redirectUri)
+                + "&scope=" + enc("read:user")
+                + "&state=" + enc(state);
+    }
+
+    /**
+     * Login WEB del pannello admin: scambia il code (redirect_uri dedicata) e identifica l'utente
+     * tramite l'id account GitHub. NON fa upsert: non vogliamo sovrascrivere il token GitHub salvato
+     * (lo scope qui è più ristretto). Ritorna vuoto se l'account non corrisponde a un utente noto.
+     */
+    public java.util.Optional<User> completeWebLogin(String code) {
+        Map<String, String> body = new HashMap<>();
+        body.put("client_id", properties.clientId());
+        body.put("client_secret", properties.clientSecret());
+        body.put("code", code);
+        body.put("redirect_uri", properties.callbackBaseUrl() + "/admin/oauth/callback");
+
+        GitHubTokenResponse token = oAuthClient.exchangeCodeForToken(body);
+        if (token.accessToken() == null || token.accessToken().isBlank()) {
+            throw new IllegalStateException("Scambio OAuth web fallito: "
+                    + (token.error() != null ? token.error() : "nessun access_token"));
+        }
+        GitHubUser githubUser = apiClient.getAuthenticatedUser("Bearer " + token.accessToken());
+        return userService.findByGithubAccountId(githubUser.id());
+    }
+
     /**
      * Completa il login: scambia il code di GitHub, recupera il profilo, fa upsert dell'utente
      * ed emette un codice usa-e-getta (NON il JWT) da consegnare all'app via App Link. Il codice

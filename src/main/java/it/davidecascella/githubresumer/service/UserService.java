@@ -58,6 +58,11 @@ public class UserService {
                         "Sessione non più valida: effettua nuovamente il login."));
     }
 
+    /** Lookup per id account GitHub, senza toccare i dati (usato dal login web del pannello admin). */
+    public java.util.Optional<User> findByGithubAccountId(Long githubAccountId) {
+        return userRepository.findByGithubAccountId(githubAccountId);
+    }
+
     public List<TrackedRepository> listTrackedRepos(Long userId) {
         return trackedRepositoryRepository.findByUserId(userId);
     }

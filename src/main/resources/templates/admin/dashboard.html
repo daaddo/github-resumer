@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="it" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin · GitHub Resumer</title>
+    <style>
+        :root {
+            --canvas: #0d1117; --elevated: #161b22; --border: #30363d;
+            --green: #238636; --text: #e6edf3; --muted: #8b949e;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; background: var(--canvas); color: var(--text);
+            font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+        }
+        header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 18px 32px; border-bottom: 1px solid var(--border); background: var(--elevated);
+        }
+        header h1 { font-size: 18px; margin: 0; }
+        .me { color: var(--muted); font-size: 14px; }
+        .me a { color: var(--green); text-decoration: none; margin-left: 16px; }
+        main { padding: 32px; max-width: 960px; margin: 0 auto; }
+        .label { color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .04em; margin-bottom: 12px; }
+        table { width: 100%; border-collapse: collapse; background: var(--elevated);
+                border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+        th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
+        th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; }
+        tr:last-child td { border-bottom: none; }
+        .user { display: flex; align-items: center; gap: 10px; }
+        .avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--border); }
+        .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px;
+                 border: 1px solid var(--border); color: var(--muted); }
+        .badge.admin { color: var(--green); border-color: var(--green); }
+        .muted { color: var(--muted); }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>GitHub Resumer · Admin</h1>
+        <span class="me">
+            <span th:if="${admin}" th:text="${admin.githubUsername}">admin</span>
+            <a href="/admin/logout">Esci</a>
+        </span>
+    </header>
+
+    <main>
+        <p class="label" th:text="'UTENTI (' + ${#lists.size(users)} + ')'">UTENTI</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Utente</th>
+                    <th>Ruolo</th>
+                    <th>Registrato</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="u : ${users}">
+                    <td>
+                        <div class="user">
+                            <img class="avatar" th:if="${u.avatarUrl}" th:src="${u.avatarUrl}" alt="" width="28" height="28">
+                            <span th:text="${u.githubUsername}">username</span>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge"
+                              th:classappend="${u.role.name() == 'ROLE_ADMIN'} ? ' admin'"
+                              th:text="${u.role}">ROLE_USER</span>
+                    </td>
+                    <td class="muted" th:text="${u.createdAt}">—</td>
+                </tr>
+                <tr th:if="${#lists.isEmpty(users)}">
+                    <td colspan="3" class="muted">Nessun utente registrato.</td>
+                </tr>
+            </tbody>
+        </table>
+    </main>
+</body>
+</html>
