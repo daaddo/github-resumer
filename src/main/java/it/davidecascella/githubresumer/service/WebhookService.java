@@ -116,15 +116,26 @@ public class WebhookService {
                 return;
             }
 
-            // Scarico il diff effettivo del push da GitHub: il payload del webhook non lo contiene.
-            String diff = fetchDiff(payload, repoFullName);
+            // Split per ruolo: il riassunto IA (e il download del diff, costoso) si calcola SOLO se
+            // almeno un destinatario è abilitato. Ai ROLE_REGISTERED va il commit grezzo, senza LLM.
+            boolean anySummaryUser = tracked.stream()
+                    .anyMatch(t -> t.getUser().getRole().canAccessSummaries());
 
-            PushSummary summary = summarizationService.summarizePush(
-                    repoFullName, payload.branch(), diff, messages);
-            log.info("summary title='{}' descLen={}", summary.title(), summary.description().length());
+            PushSummary aiSummary = null;
+            if (anySummaryUser) {
+                // Scarico il diff effettivo del push da GitHub: il payload del webhook non lo contiene.
+                String diff = fetchDiff(payload, repoFullName);
+                aiSummary = summarizationService.summarizePush(
+                        repoFullName, payload.branch(), diff, messages);
+                log.info("summary IA title='{}' descLen={}", aiSummary.title(), aiSummary.description().length());
+            }
+            // Titolo+descrizione del commit di testa, per i ROLE_REGISTERED (calcolato una volta sola).
+            PushSummary rawSummary = rawCommitSummary(payload);
+
             String commitId = payload.headCommitId();
             for (TrackedRepository repo : tracked) {
                 User user = repo.getUser();
+                PushSummary summary = user.getRole().canAccessSummaries() ? aiSummary : rawSummary;
                 if (commitId != null) {
                     notificationService.record(user, repoFullName, summary.title(), summary.description(), commitId);
                 }
@@ -181,5 +192,38 @@ public class WebhookService {
             log.error("Impossibile scaricare il diff di {}: {}", repoFullName, e.getMessage());
             return "";
         }
+    }
+
+    /**
+     * Notifica "grezza" per gli utenti senza accesso al riassunto IA: nessun LLM, solo il messaggio
+     * del commit di testa diviso secondo la convenzione git (prima riga = titolo, resto = descrizione).
+     * Ritorna sempre un PushSummary valido (mai null), con il troncamento applicato da PushSummary.
+     */
+    private PushSummary rawCommitSummary(PushEventPayload payload) {
+        String message = headCommitMessage(payload);
+        if (message == null || message.isBlank()) {
+            return new PushSummary("Nuovo commit", "");
+        }
+        int newline = message.indexOf('\n');
+        if (newline < 0) {
+            return new PushSummary(message, "");
+        }
+        return new PushSummary(message.substring(0, newline), message.substring(newline + 1));
+    }
+
+    /** Messaggio del commit di testa (match per id su {@code after}); fallback sull'ultimo commit. */
+    private String headCommitMessage(PushEventPayload payload) {
+        if (payload.commits() == null || payload.commits().isEmpty()) {
+            return null;
+        }
+        String head = payload.headCommitId();
+        if (head != null) {
+            for (PushEventPayload.Commit commit : payload.commits()) {
+                if (head.equals(commit.id())) {
+                    return commit.message();
+                }
+            }
+        }
+        return payload.commits().get(payload.commits().size() - 1).message();
     }
 }

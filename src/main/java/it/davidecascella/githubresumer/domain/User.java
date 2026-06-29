@@ -51,11 +51,14 @@ public class User {
     @Column(name = "avatar_url", length = 512)
     private String avatarUrl;
 
-    /** Ruolo applicativo. Nuovi utenti: ROLE_USER; gli admin si promuovono a mano via DB. */
+    /**
+     * Ruolo applicativo. Nuovi iscritti: ROLE_REGISTERED (niente riassunto IA); l'abilitazione a
+     * ROLE_USER e la promozione a ROLE_ADMIN si fanno a mano via DB.
+     */
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 20)
     @Builder.Default
-    private Role role = Role.ROLE_USER;
+    private Role role = Role.ROLE_REGISTERED;
 
     @CreatedDate
     @Column(name = "created_at", updatable = false)

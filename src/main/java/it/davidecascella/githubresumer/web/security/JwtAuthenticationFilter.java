@@ -20,7 +20,8 @@ import java.util.List;
 
 /**
  * Autenticazione Bearer per /api/**: legge "Authorization: Bearer &lt;jwt&gt;", valida il token e
- * popola il SecurityContext con principal = id utente e authority = ruolo (ROLE_USER/ROLE_ADMIN).
+ * popola il SecurityContext con principal = id utente e authority = ruolo
+ * (ROLE_REGISTERED/ROLE_USER/ROLE_ADMIN).
  *
  * <p>Il ruolo viene riletto dal DB a ogni richiesta (lookup per chiave primaria): così una
  * revoca/declassamento ha effetto immediato, senza aspettare la scadenza dell'access token.
