@@ -83,6 +83,21 @@ public class UserService {
     }
 
     /**
+     * Accende/spegne il digest per un repo che l'utente segue già. Non crea la riga: se il repo
+     * non è tra quelli seguiti risponde 404 (il follow si fa con {@link #trackRepo}). Restituisce
+     * la riga aggiornata.
+     */
+    @Transactional
+    public TrackedRepository setTracked(Long userId, String repoFullName, boolean tracked) {
+        TrackedRepository repo = trackedRepositoryRepository
+                .findByUserIdAndRepoFullName(userId, repoFullName)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Repository non seguito: aggiungilo prima di cambiarne il tracking."));
+        repo.setTracked(tracked);
+        return trackedRepositoryRepository.save(repo);
+    }
+
+    /**
      * Ritorna le organizzazioni dell'utente con i rispettivi repository,
      * iterando tutte le pagine di ciascuna risorsa GitHub.
      */

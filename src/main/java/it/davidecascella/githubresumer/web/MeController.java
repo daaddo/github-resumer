@@ -8,6 +8,7 @@ import it.davidecascella.githubresumer.web.dto.FcmTokenRequest;
 import it.davidecascella.githubresumer.web.dto.NotificationResponse;
 import it.davidecascella.githubresumer.web.dto.OrgWithReposResponse;
 import it.davidecascella.githubresumer.web.dto.PageResponse;
+import it.davidecascella.githubresumer.web.dto.SetTrackedRequest;
 import it.davidecascella.githubresumer.web.dto.TrackRepoRequest;
 import it.davidecascella.githubresumer.web.dto.TrackedRepoResponse;
 import it.davidecascella.githubresumer.web.security.JwtAuthInterceptor;
@@ -16,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestAttribute;
@@ -93,6 +95,18 @@ public class MeController {
             @Valid @RequestBody TrackRepoRequest request) {
         userService.untrackRepo(userId, request.repoFullName());
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Accende/spegne il digest IA per un repo già seguito, senza rimuoverlo dalla lista.
+     * 404 se il repo non è tra quelli seguiti dall'utente.
+     */
+    @PatchMapping("/tracked-repos")
+    public TrackedRepoResponse setTracked(
+            @RequestAttribute(JwtAuthInterceptor.USER_ID_ATTRIBUTE) Long userId,
+            @Valid @RequestBody SetTrackedRequest request) {
+        return TrackedRepoResponse.from(
+                userService.setTracked(userId, request.repoFullName(), request.tracked()));
     }
 
     /** Organizzazioni dell'utente con i rispettivi repository */

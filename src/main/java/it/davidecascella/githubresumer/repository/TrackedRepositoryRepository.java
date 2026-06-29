@@ -26,6 +26,15 @@ public interface TrackedRepositoryRepository extends JpaRepository<TrackedReposi
     @Query("select t from TrackedRepository t join fetch t.user where t.repoFullName = :repoFullName")
     List<TrackedRepository> findByRepoFullNameFetchUser(@Param("repoFullName") String repoFullName);
 
+    /**
+     * Come {@link #findByRepoFullNameFetchUser}, ma solo le righe con {@code tracked = true}.
+     * È il gate del digest: il webhook produce e recapita il riassunto solo agli utenti che
+     * hanno attivato il tracking per quel repo (gli altri lo "seguono" ma sono silenziati).
+     */
+    @Query("select t from TrackedRepository t join fetch t.user " +
+            "where t.repoFullName = :repoFullName and t.tracked = true")
+    List<TrackedRepository> findTrackedByRepoFullNameFetchUser(@Param("repoFullName") String repoFullName);
+
     Optional<TrackedRepository> findByUserIdAndRepoFullName(Long userId, String repoFullName);
 
     /** Tracked repo provenienti da una specifica installazione (per la riconciliazione). */

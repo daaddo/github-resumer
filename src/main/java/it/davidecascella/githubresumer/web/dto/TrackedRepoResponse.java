@@ -2,8 +2,8 @@ package it.davidecascella.githubresumer.web.dto;
 
 import it.davidecascella.githubresumer.domain.TrackedRepository;
 
-public record TrackedRepoResponse(Long id, String repoFullName) {
+public record TrackedRepoResponse(Long id, String repoFullName, boolean tracked) {
     public static TrackedRepoResponse from(TrackedRepository entity) {
-        return new TrackedRepoResponse(entity.getId(), entity.getRepoFullName());
+        return new TrackedRepoResponse(entity.getId(), entity.getRepoFullName(), entity.isTracked());
     }
 }

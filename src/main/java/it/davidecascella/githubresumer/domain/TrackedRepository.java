@@ -47,4 +47,13 @@ public class TrackedRepository {
     /** Installazione che ha portato questo repo (NULL = tracciato manualmente dall'utente). */
     @Column(name = "installation_id")
     private Long installationId;
+
+    /**
+     * Se true l'utente vuole ricevere il digest IA per questo repo; se false il repo resta
+     * nella sua lista ("followed") ma è silenziato. Il webhook produce il digest solo quando
+     * almeno un utente ha tracked = true. Default true (opt-out): i repo importati notificano.
+     */
+    @Column(name = "tracked", nullable = false)
+    @Builder.Default
+    private boolean tracked = true;
 }

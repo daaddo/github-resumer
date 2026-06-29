@@ -95,12 +95,14 @@ public class WebhookService {
             }
             String repoFullName = payload.repository().fullName();
 
-            // Regola del Buttafuori: procedo solo se almeno un utente traccia questo repo.
-            // findByRepoFullNameFetchUser carica anche lo User (JOIN FETCH): qui siamo in un thread
-            // @Async senza sessione, quindi non possiamo permetterci un accesso lazy più avanti.
-            List<TrackedRepository> tracked = trackedRepositoryRepository.findByRepoFullNameFetchUser(repoFullName);
+            // Regola del Buttafuori: procedo solo se almeno un utente ha tracked = true su questo
+            // repo (chi lo "segue" soltanto è silenziato). findTrackedByRepoFullNameFetchUser carica
+            // anche lo User (JOIN FETCH): qui siamo in un thread @Async senza sessione, quindi non
+            // possiamo permetterci un accesso lazy più avanti.
+            List<TrackedRepository> tracked =
+                    trackedRepositoryRepository.findTrackedByRepoFullNameFetchUser(repoFullName);
             if (tracked.isEmpty()) {
-                log.debug("Repo {} non tracciato da alcun utente: scartato.", repoFullName);
+                log.debug("Repo {} non tracciato attivamente da alcun utente: scartato.", repoFullName);
                 return;
             }
 
