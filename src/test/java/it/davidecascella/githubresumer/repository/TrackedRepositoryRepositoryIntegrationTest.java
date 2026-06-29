@@ -71,6 +71,43 @@ class TrackedRepositoryRepositoryIntegrationTest extends AbstractIntegrationTest
                 .isInstanceOf(LazyInitializationException.class);
     }
 
+    /**
+     * Gate del digest: lo stesso repo è seguito da due utenti, ma solo uno ha tracked = true.
+     * La query del webhook deve restituire SOLO quella riga (l'altro lo "segue" ma è silenziato)
+     * e materializzare lo User fuori sessione.
+     */
+    @Test
+    void findTrackedByRepoFullNameFetchUser_returnsOnlyTrackedRows_andMaterializesUser() {
+        seedTrackedRepoForUser(GITHUB_USERNAME, 1024L, true);
+        seedTrackedRepoForUser("silent-watcher", 2048L, false);
+
+        List<TrackedRepository> tracked =
+                trackedRepositoryRepository.findTrackedByRepoFullNameFetchUser(REPO_FULL_NAME);
+
+        assertThat(tracked).hasSize(1);
+        assertThat(tracked.get(0).isTracked()).isTrue();
+        // JOIN FETCH: lo User è accessibile anche senza sessione (come nel thread @Async del webhook).
+        assertThat(tracked.get(0).getUser().getGithubUsername()).isEqualTo(GITHUB_USERNAME);
+    }
+
+    /** Se il repo è seguito ma nessuno lo traccia attivamente, il gate è vuoto: niente digest. */
+    @Test
+    void findTrackedByRepoFullNameFetchUser_empty_whenFollowedButNobodyTracks() {
+        seedTrackedRepoForUser(GITHUB_USERNAME, 1024L, false);
+
+        assertThat(trackedRepositoryRepository.findTrackedByRepoFullNameFetchUser(REPO_FULL_NAME))
+                .isEmpty();
+    }
+
+    /** Opt-out: una riga creata senza specificare il flag nasce con tracked = true. */
+    @Test
+    void trackedFlag_defaultsTrue() {
+        seedTrackedRepoWithUser();
+
+        TrackedRepository row = trackedRepositoryRepository.findByRepoFullName(REPO_FULL_NAME).get(0);
+        assertThat(row.isTracked()).isTrue();
+    }
+
     private void seedTrackedRepoWithUser() {
         User user = userRepository.save(User.builder()
                 .githubUsername(GITHUB_USERNAME)
@@ -81,6 +118,20 @@ class TrackedRepositoryRepositoryIntegrationTest extends AbstractIntegrationTest
         trackedRepositoryRepository.save(TrackedRepository.builder()
                 .user(user)
                 .repoFullName(REPO_FULL_NAME)
+                .build());
+    }
+
+    private void seedTrackedRepoForUser(String username, long accountId, boolean tracked) {
+        User user = userRepository.save(User.builder()
+                .githubUsername(username)
+                .githubAccountId(accountId)
+                .githubAccessToken("gho_test_token")
+                .build());
+
+        trackedRepositoryRepository.save(TrackedRepository.builder()
+                .user(user)
+                .repoFullName(REPO_FULL_NAME)
+                .tracked(tracked)
                 .build());
     }
 }

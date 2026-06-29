@@ -11,16 +11,15 @@ import it.davidecascella.githubresumer.web.dto.PageResponse;
 import it.davidecascella.githubresumer.web.dto.SetTrackedRequest;
 import it.davidecascella.githubresumer.web.dto.TrackRepoRequest;
 import it.davidecascella.githubresumer.web.dto.TrackedRepoResponse;
-import it.davidecascella.githubresumer.web.security.JwtAuthInterceptor;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -54,7 +53,7 @@ public class MeController {
     /** Registra/aggiorna il token FCM del dispositivo corrente (multi-dispositivo: uno per device). */
     @PutMapping("/fcm-token")
     public ResponseEntity<Void> updateFcmToken(
-            @RequestAttribute(JwtAuthInterceptor.USER_ID_ATTRIBUTE) Long userId,
+            @AuthenticationPrincipal Long userId,
             @Valid @RequestBody FcmTokenRequest request) {
         deviceTokenService.register(userId, request.fcmToken());
         return ResponseEntity.noContent().build();
@@ -67,14 +66,14 @@ public class MeController {
      */
     @PostMapping("/logout-all")
     public ResponseEntity<Void> logoutAll(
-            @RequestAttribute(JwtAuthInterceptor.USER_ID_ATTRIBUTE) Long userId) {
+            @AuthenticationPrincipal Long userId) {
         oAuthService.logoutEverywhere(userId);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/tracked-repos")
     public List<TrackedRepoResponse> listTrackedRepos(
-            @RequestAttribute(JwtAuthInterceptor.USER_ID_ATTRIBUTE) Long userId) {
+            @AuthenticationPrincipal Long userId) {
         return userService.listTrackedRepos(userId).stream()
                 .map(TrackedRepoResponse::from)
                 .toList();
@@ -82,7 +81,7 @@ public class MeController {
 
     @PostMapping("/tracked-repos")
     public ResponseEntity<TrackedRepoResponse> trackRepo(
-            @RequestAttribute(JwtAuthInterceptor.USER_ID_ATTRIBUTE) Long userId,
+            @AuthenticationPrincipal Long userId,
             @Valid @RequestBody TrackRepoRequest request) {
         TrackedRepoResponse response = TrackedRepoResponse.from(
                 userService.trackRepo(userId, request.repoFullName()));
@@ -91,7 +90,7 @@ public class MeController {
 
     @DeleteMapping("/tracked-repos")
     public ResponseEntity<Void> untrackRepo(
-            @RequestAttribute(JwtAuthInterceptor.USER_ID_ATTRIBUTE) Long userId,
+            @AuthenticationPrincipal Long userId,
             @Valid @RequestBody TrackRepoRequest request) {
         userService.untrackRepo(userId, request.repoFullName());
         return ResponseEntity.noContent().build();
@@ -103,7 +102,7 @@ public class MeController {
      */
     @PatchMapping("/tracked-repos")
     public TrackedRepoResponse setTracked(
-            @RequestAttribute(JwtAuthInterceptor.USER_ID_ATTRIBUTE) Long userId,
+            @AuthenticationPrincipal Long userId,
             @Valid @RequestBody SetTrackedRequest request) {
         return TrackedRepoResponse.from(
                 userService.setTracked(userId, request.repoFullName(), request.tracked()));
@@ -112,7 +111,7 @@ public class MeController {
     /** Organizzazioni dell'utente con i rispettivi repository */
     @GetMapping("/github-orgs")
     public List<OrgWithReposResponse> listGithubOrgs(
-            @RequestAttribute(JwtAuthInterceptor.USER_ID_ATTRIBUTE) Long userId) {
+            @AuthenticationPrincipal Long userId) {
         return userService.getGithubOrgsWithRepos(userId);
     }
 
@@ -123,7 +122,7 @@ public class MeController {
      */
     @GetMapping("/notifications")
     public PageResponse<NotificationResponse> listNotifications(
-            @RequestAttribute(JwtAuthInterceptor.USER_ID_ATTRIBUTE) Long userId,
+            @AuthenticationPrincipal Long userId,
             @RequestParam(required = false) String repo,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
@@ -140,7 +139,7 @@ public class MeController {
      */
     @DeleteMapping("/notifications/{id}")
     public ResponseEntity<Void> deleteNotification(
-            @RequestAttribute(JwtAuthInterceptor.USER_ID_ATTRIBUTE) Long userId,
+            @AuthenticationPrincipal Long userId,
             @PathVariable("id") Long id) {
         notificationService.delete(userId, id);
         return ResponseEntity.noContent().build();

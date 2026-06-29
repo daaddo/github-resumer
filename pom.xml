@@ -48,6 +48,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>
+        <!-- Spring Security: autenticazione (bearer JWT su /api/**, cookie sul pannello /admin/**) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
         <!-- Thymeleaf: rendering server-side delle pagine del pannello di amministrazione -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -131,6 +136,12 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Utility per testare endpoint protetti da Spring Security (@WithMockUser, ecc.) -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
 

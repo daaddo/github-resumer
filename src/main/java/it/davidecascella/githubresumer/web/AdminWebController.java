@@ -5,13 +5,13 @@ import it.davidecascella.githubresumer.domain.User;
 import it.davidecascella.githubresumer.repository.UserRepository;
 import it.davidecascella.githubresumer.service.GitHubOAuthService;
 import it.davidecascella.githubresumer.service.JwtService;
-import it.davidecascella.githubresumer.web.security.AdminWebAuthInterceptor;
-import jakarta.servlet.http.HttpServletRequest;
+import it.davidecascella.githubresumer.web.security.AdminCookieAuthenticationFilter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.CookieValue;
@@ -104,12 +104,11 @@ public class AdminWebController {
                 .build();
     }
 
-    /** Dashboard: elenco utenti. L'accesso è già garantito admin dall'interceptor. */
+    /** Dashboard: elenco utenti. L'accesso è già garantito admin dalla SecurityConfig. */
     @GetMapping({"", "/"})
-    public String dashboard(HttpServletRequest request, Model model) {
-        Object adminId = request.getAttribute(AdminWebAuthInterceptor.ADMIN_ID_ATTRIBUTE);
-        if (adminId instanceof Long id) {
-            userRepository.findById(id).ifPresent(u -> model.addAttribute("admin", u));
+    public String dashboard(@AuthenticationPrincipal Long adminId, Model model) {
+        if (adminId != null) {
+            userRepository.findById(adminId).ifPresent(u -> model.addAttribute("admin", u));
         }
         model.addAttribute("users", userRepository.findAll());
         return "admin/dashboard";
@@ -140,12 +139,12 @@ public class AdminWebController {
 
     private static ResponseCookie sessionCookie(String jwt) {
         // Cookie di sessione (niente maxAge → si chiude col browser). La validità effettiva
-        // è governata dalla scadenza del JWT: se scade, l'interceptor rimanda al login.
-        return baseCookie(AdminWebAuthInterceptor.SESSION_COOKIE, jwt).build();
+        // è governata dalla scadenza del JWT: se scade, la SecurityConfig rimanda al login.
+        return baseCookie(AdminCookieAuthenticationFilter.SESSION_COOKIE, jwt).build();
     }
 
     private static ResponseCookie expiredSession() {
-        return baseCookie(AdminWebAuthInterceptor.SESSION_COOKIE, "").maxAge(Duration.ZERO).build();
+        return baseCookie(AdminCookieAuthenticationFilter.SESSION_COOKIE, "").maxAge(Duration.ZERO).build();
     }
 
     private static ResponseCookie.ResponseCookieBuilder baseCookie(String name, String value) {
