@@ -112,27 +112,6 @@ public class GitHubOAuthService {
     }
 
     /**
-     * Identifica l'utente a partire dal code OAuth ricevuto durante l'installazione della GitHub App
-     * ("Install & Authorize"): scambia il code, recupera il profilo GitHub e fa upsert dell'utente.
-     * Non emette sessione: serve solo a sapere CHI sta installando, per legargli i repo.
-     */
-    public AuthenticatedGitHubUser authenticateUserFromCode(String code) {
-        Map<String, String> body = new HashMap<>();
-        body.put("client_id", properties.clientId());
-        body.put("client_secret", properties.clientSecret());
-        body.put("code", code);
-
-        GitHubTokenResponse token = oAuthClient.exchangeCodeForToken(body);
-        if (token.accessToken() == null || token.accessToken().isBlank()) {
-            throw new IllegalStateException("Scambio OAuth (installazione) fallito: "
-                    + (token.error() != null ? token.error() : "nessun access_token"));
-        }
-        GitHubUser githubUser = apiClient.getAuthenticatedUser("Bearer " + token.accessToken());
-        User user = userService.upsertFromGitHub(githubUser, token.accessToken());
-        return new AuthenticatedGitHubUser(user, token.accessToken());
-    }
-
-    /**
      * Scambia il codice usa-e-getta con una sessione: consuma il codice (uso singolo) verificando
      * la prova PKCE (code_verifier) e, se valido, emette access token + refresh token per l'utente.
      */
@@ -181,12 +160,28 @@ public class GitHubOAuthService {
         return page(appUrl("error", error));
     }
 
-    /** Pagina HTML che, dopo l'installazione della App, rimbalza all'app segnalando quanti repo sono stati tracciati. */
-    public String buildAppInstalledPage(int trackedCount) {
+    /**
+     * Pagina HTML che, dopo l'installazione della App, rimbalza all'app. Non riporta il numero di
+     * repo: la riconciliazione avviene in modo asincrono sul webhook, quindi al callback il conteggio
+     * non è ancora disponibile. L'app ricarica la lista dei repo via API.
+     */
+    public String buildAppInstalledPage() {
         String base = properties.appRedirectUri();
         String sep = base.contains("?") ? "&" : "?";
-        String url = base + sep + "installed=true&count=" + enc(String.valueOf(trackedCount));
+        String url = base + sep + "installed=true";
         log.info("Redirect all'app dopo installazione: url={}", url);
+        return page(url);
+    }
+
+    /**
+     * Pagina HTML per la RICHIESTA di installazione su un'organizzazione (setup_action=request):
+     * l'installazione è in attesa dell'approvazione di un owner. Rimbalza all'app segnalandolo.
+     */
+    public String buildAppPendingPage() {
+        String base = properties.appRedirectUri();
+        String sep = base.contains("?") ? "&" : "?";
+        String url = base + sep + "installation=pending";
+        log.info("Redirect all'app: richiesta installazione in attesa di approvazione, url={}", url);
         return page(url);
     }
 

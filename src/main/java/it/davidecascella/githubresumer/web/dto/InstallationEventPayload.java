@@ -5,13 +5,21 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * Sottoinsieme dei payload "installation" e "installation_repositories" di GitHub.
- * Entrambi contengono un oggetto "installation" con l'id: ci basta quello (+ l'azione)
- * per riconciliare i repo dell'installazione.
+ *
+ * <p>Oltre all'installazione (id + selezione repo) ci interessano due attori, usati al "created"
+ * per legare l'installazione all'utente giusto:
+ * <ul>
+ *   <li>{@code requester}: chi ha RICHIESTO l'installazione (valorizzato solo nel flusso
+ *       richiesta&rarr;approvazione su org; {@code null} nelle installazioni dirette);</li>
+ *   <li>{@code sender}: chi ha scatenato l'evento (l'installatore diretto, o l'owner che approva).</li>
+ * </ul>
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record InstallationEventPayload(
         String action,
-        Installation installation
+        Installation installation,
+        Account requester,
+        Account sender
 ) {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Installation(
@@ -22,6 +30,6 @@ public record InstallationEventPayload(
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Account(String login) {
+    public record Account(Long id, String login) {
     }
 }

@@ -24,6 +24,11 @@ import java.util.Set;
  * installation_id rispecchiano esattamente i repo correnti di quella installazione su GitHub:
  * ogni cambiamento (aggiunta, rimozione, passaggio selected<->all) converge allo stesso codice.
  * I repo tracciati manualmente (installation_id NULL) non vengono toccati.
+ *
+ * <p>Le installazioni nascono SOLO dal webhook "installation/created" (server-to-server, firmato):
+ * il callback OAuth non scrive nulla. Vale la regola: si installa solo per utenti GIÀ registrati
+ * (login a monte). Un'installazione richiesta da un utente sconosciuto viene rifiutata
+ * disinstallando la App.
  */
 @Slf4j
 @Service
@@ -31,20 +36,17 @@ public class InstallationService {
 
     private static final int PAGE_SIZE = 100;
 
-    private final GitHubOAuthService oAuthService;
     private final GitHubAppService gitHubAppService;
     private final GitHubApiClient gitHubApiClient;
     private final InstallationRepository installationRepository;
     private final TrackedRepositoryRepository trackedRepositoryRepository;
     private final UserRepository userRepository;
 
-    public InstallationService(GitHubOAuthService oAuthService,
-                               GitHubAppService gitHubAppService,
+    public InstallationService(GitHubAppService gitHubAppService,
                                GitHubApiClient gitHubApiClient,
                                InstallationRepository installationRepository,
                                TrackedRepositoryRepository trackedRepositoryRepository,
                                UserRepository userRepository) {
-        this.oAuthService = oAuthService;
         this.gitHubAppService = gitHubAppService;
         this.gitHubApiClient = gitHubApiClient;
         this.installationRepository = installationRepository;
@@ -53,28 +55,38 @@ public class InstallationService {
     }
 
     /**
-     * Setup post-installazione: identifica l'utente dal code, salva la mappa installation->utente
-     * e traccia i repo dell'installazione. Ritorna il numero di repo tracciati.
+     * Webhook "installation/created": crea l'installazione e traccia i repo, ma SOLO se l'attore
+     * che la porta è un utente già registrato. L'attore è il {@code requester} (chi ha richiesto su
+     * un'org) o, in mancanza (installazione diretta), il {@code sender}. Se non è registrato,
+     * l'installazione viene RIFIUTATA disinstallando la App (DELETE /app/installations/{id}).
      */
     @Transactional
-    public int linkInstallation(String code, long installationId) {
-        AuthenticatedGitHubUser auth = oAuthService.authenticateUserFromCode(code);
-        Long userId = auth.user().getId();
+    public void onInstallationCreated(long installationId, String repositorySelection,
+                                      String accountLogin, Long requesterGithubId, Long senderGithubId) {
+        Long actorGithubId = requesterGithubId != null ? requesterGithubId : senderGithubId;
+        User user = actorGithubId != null
+                ? userRepository.findByGithubAccountId(actorGithubId).orElse(null)
+                : null;
 
-        // ANTI-IDOR: elenchiamo con il token UTENTE. Se l'utente non ha accesso a questa
-        // installazione, GitHub risponde 404 e qui non leghiamo nulla (niente accesso ai repo altrui).
-        Set<String> repos = fetchUserInstallationRepoNames(auth.accessToken(), installationId);
+        if (user == null) {
+            log.warn("Installazione {} portata da utente GitHub {} non registrato: rifiuto (disinstallo la App).",
+                    installationId, actorGithubId);
+            gitHubAppService.deleteInstallation(installationId);
+            return;
+        }
 
-        upsertInstallation(installationId, userId, null, null);
-        int count = reconcileWith(installationId, userId, repos);
-        log.info("Installazione {} collegata all'utente {}: {} repo tracciati.",
-                installationId, userId, count);
-        return count;
+        upsertInstallation(installationId, user.getId(), accountLogin, repositorySelection,
+                requesterGithubId, senderGithubId);
+        // Webhook: nessun token utente disponibile. Usiamo l'installation token (server-to-server).
+        Set<String> repos = fetchInstallationRepoNames(installationId);
+        int count = reconcileWith(installationId, user.getId(), repos);
+        log.info("Installazione {} creata per l'utente {}: {} repo tracciati.",
+                installationId, user.getId(), count);
     }
 
     /**
      * Riconcilia un'installazione a seguito di un webhook (aggiunta/rimozione repo, cambio
-     * selezione). Richiede che l'installazione sia già nota (mappata a un utente dal setup).
+     * selezione). Richiede che l'installazione sia già nota (creata al "created").
      */
     @Transactional
     public void reconcileInstallation(long installationId, String repositorySelection, String accountLogin) {
@@ -91,7 +103,7 @@ public class InstallationService {
         }
         installationRepository.save(inst);
         // Webhook: nessun token utente disponibile. Usiamo l'installation token (server-to-server):
-        // è sicuro perché la mappa installation_id -> utente è stata verificata al setup.
+        // è sicuro perché la mappa installation_id -> utente è stata verificata al "created".
         Set<String> repos = fetchInstallationRepoNames(installationId);
         int count = reconcileWith(installationId, inst.getUserId(), repos);
         log.info("Installazione {} riconciliata (utente {}): {} repo tracciati.",
@@ -112,7 +124,8 @@ public class InstallationService {
         log.info("Installazione {} rimossa: {} repo non più tracciati.", installationId, tracked.size());
     }
 
-    private void upsertInstallation(long installationId, Long userId, String accountLogin, String selection) {
+    private void upsertInstallation(long installationId, Long userId, String accountLogin, String selection,
+                                    Long requesterGithubId, Long senderGithubId) {
         Installation inst = installationRepository.findByInstallationId(installationId)
                 .orElseGet(Installation::new);
         inst.setInstallationId(installationId);
@@ -123,6 +136,8 @@ public class InstallationService {
         if (selection != null) {
             inst.setRepositorySelection(selection);
         }
+        inst.setRequesterGithubId(requesterGithubId);
+        inst.setSenderGithubId(senderGithubId);
         installationRepository.save(inst);
     }
 
@@ -167,28 +182,6 @@ public class InstallationService {
         while (true) {
             InstallationRepositoriesResponse resp =
                     gitHubApiClient.getInstallationRepositories(bearer, PAGE_SIZE, page++);
-            for (GitHubRepo repo : resp.repositories()) {
-                names.add(repo.fullName());
-            }
-            if (resp.repositories().size() < PAGE_SIZE) {
-                break;
-            }
-        }
-        return names;
-    }
-
-    /**
-     * Repo dell'installazione via token UTENTE: ritorna i repo solo se l'utente ha accesso a
-     * quell'installazione (altrimenti GitHub risponde 404). Usato al setup per verificare la
-     * proprietà dell'installation_id ed evitare accessi a installazioni altrui.
-     */
-    private Set<String> fetchUserInstallationRepoNames(String userAccessToken, long installationId) {
-        String bearer = "Bearer " + userAccessToken;
-        Set<String> names = new HashSet<>();
-        int page = 1;
-        while (true) {
-            InstallationRepositoriesResponse resp =
-                    gitHubApiClient.getUserInstallationRepositories(bearer, installationId, PAGE_SIZE, page++);
             for (GitHubRepo repo : resp.repositories()) {
                 names.add(repo.fullName());
             }

@@ -1,7 +1,6 @@
 package it.davidecascella.githubresumer.web;
 
 import it.davidecascella.githubresumer.service.GitHubOAuthService;
-import it.davidecascella.githubresumer.service.InstallationService;
 import it.davidecascella.githubresumer.service.SessionTokens;
 import it.davidecascella.githubresumer.web.dto.ExchangeRequest;
 import it.davidecascella.githubresumer.web.dto.RefreshRequest;
@@ -48,11 +47,9 @@ public class AuthController {
     private static final Pattern CHALLENGE_PATTERN = Pattern.compile("[A-Za-z0-9\\-_]{43}");
 
     private final GitHubOAuthService oAuthService;
-    private final InstallationService installationService;
 
-    public AuthController(GitHubOAuthService oAuthService, InstallationService installationService) {
+    public AuthController(GitHubOAuthService oAuthService) {
         this.oAuthService = oAuthService;
-        this.installationService = installationService;
     }
 
     /**
@@ -97,15 +94,22 @@ public class AuthController {
             @CookieValue(value = STATE_COOKIE, required = false) String expectedState,
             @CookieValue(value = CHALLENGE_COOKIE, required = false) String codeChallenge) {
 
-        // Flusso di INSTALLAZIONE: con "OAuth during installation" attivo la Setup URL è disabilitata,
-        // quindi GitHub reindirizza QUI con installation_id (senza passare da /github/login, dunque
-        // senza cookie PKCE/state). Lo riconosciamo dalla presenza di installation_id.
+        // Flusso di INSTALLAZIONE (installation_id presente) o di RICHIESTA di installazione su org
+        // (setup_action=request, senza installation_id). In ENTRAMBI i casi il callback NON scrive
+        // nulla: l'installazione nasce solo dal webhook firmato. Qui rimbalziamo solo all'app.
+        // L'utente viene legato all'installazione lato webhook (requester), e solo se già registrato.
         if (installationId != null) {
-            log.info("Callback con installation_id={}, setup_action={}: flusso di installazione",
+            log.info("Callback installazione: installation_id={}, setup_action={} -> rimbalzo all'app (nessuna scrittura)",
                     installationId, setupAction);
             return ResponseEntity.ok()
                     .contentType(MediaType.TEXT_HTML)
-                    .body(buildInstallResult(code, installationId));
+                    .body(oAuthService.buildAppInstalledPage());
+        }
+        if ("request".equals(setupAction)) {
+            log.info("Callback richiesta installazione (setup_action=request) -> pagina 'in attesa di approvazione'");
+            return ResponseEntity.ok()
+                    .contentType(MediaType.TEXT_HTML)
+                    .body(oAuthService.buildAppPendingPage());
         }
 
         log.info("Callback OAuth ricevuta: code presente={}, error={}, challenge presente={}",
@@ -139,26 +143,6 @@ public class AuthController {
                 .header(HttpHeaders.SET_COOKIE, cookie(CHALLENGE_COOKIE, "", Duration.ZERO).toString())
                 .contentType(MediaType.TEXT_HTML)
                 .body(body);
-    }
-
-    /**
-     * Gestisce il ritorno dopo "Install & Authorize": identifica l'utente dal code OAuth ricevuto
-     * durante l'installazione, traccia i repo dell'installazione e produce la pagina HTML che rimbalza
-     * all'app via App Link https (…/app/callback?installed=true&count=N).
-     */
-    private String buildInstallResult(String code, Long installationId) {
-        if (code == null || code.isBlank()) {
-            log.warn("Installazione senza code: verificare che 'Request user authorization (OAuth) during installation' sia attivo");
-            return oAuthService.buildAppErrorPage("missing_code");
-        }
-        try {
-            int count = installationService.linkInstallation(code, installationId);
-            log.info("Installazione completata: {} repo tracciati, rimbalzo all'app", count);
-            return oAuthService.buildAppInstalledPage(count);
-        } catch (Exception e) {
-            log.warn("Installazione fallita", e);
-            return oAuthService.buildAppErrorPage("install_failed");
-        }
     }
 
     /** L'app scambia il codice usa-e-getta con access token + refresh token (back-channel HTTPS). */

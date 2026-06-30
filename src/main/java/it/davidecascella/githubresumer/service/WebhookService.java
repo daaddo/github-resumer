@@ -57,8 +57,13 @@ public class WebhookService {
 
     /**
      * Gestisce gli eventi "installation" e "installation_repositories" fuori dal thread della richiesta.
-     * Su "deleted" rimuove l'installazione; per ogni altra azione riconcilia i repo tracciati con
-     * lo stato corrente su GitHub (copre aggiunte, rimozioni e passaggio selected<->all).
+     * <ul>
+     *   <li>"created": crea l'installazione legandola all'utente (requester, o sender se diretta),
+     *       rifiutandola se l'utente non è registrato;</li>
+     *   <li>"deleted": rimuove l'installazione;</li>
+     *   <li>ogni altra azione (aggiunta/rimozione repo, suspend/unsuspend): riconcilia i repo
+     *       tracciati con lo stato corrente su GitHub.</li>
+     * </ul>
      */
     @Async
     public void handleInstallationAsync(byte[] rawPayload) {
@@ -69,13 +74,18 @@ public class WebhookService {
                 return;
             }
             long installationId = payload.installation().id();
+            String selection = payload.installation().repositorySelection();
+            String accountLogin = payload.installation().account() != null
+                    ? payload.installation().account().login() : null;
 
-            if ("deleted".equals(payload.action())) {
+            if ("created".equals(payload.action())) {
+                Long requesterId = payload.requester() != null ? payload.requester().id() : null;
+                Long senderId = payload.sender() != null ? payload.sender().id() : null;
+                installationService.onInstallationCreated(
+                        installationId, selection, accountLogin, requesterId, senderId);
+            } else if ("deleted".equals(payload.action())) {
                 installationService.removeInstallation(installationId);
             } else {
-                String selection = payload.installation().repositorySelection();
-                String accountLogin = payload.installation().account() != null
-                        ? payload.installation().account().login() : null;
                 installationService.reconcileInstallation(installationId, selection, accountLogin);
             }
         } catch (Exception e) {

@@ -56,6 +56,14 @@ public class Installation {
     @Column(name = "repository_selection")
     private String repositorySelection;
 
+    /** ID GitHub di chi ha RICHIESTO l'installazione (null se installazione diretta). Informativo/audit. */
+    @Column(name = "requester_github_id")
+    private Long requesterGithubId;
+
+    /** ID GitHub di chi ha scatenato l'evento "created" (installatore diretto o owner approvante). Audit. */
+    @Column(name = "sender_github_id")
+    private Long senderGithubId;
+
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;

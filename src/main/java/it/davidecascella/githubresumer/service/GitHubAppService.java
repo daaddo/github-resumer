@@ -59,6 +59,11 @@ public class GitHubAppService {
         return response.token();
     }
 
+    /** Disinstalla la App da questa installazione (rifiuto di un'installazione non ammessa). */
+    public void deleteInstallation(long installationId) {
+        gitHubApiClient.deleteInstallation(installationId, "Bearer " + generateAppJwt());
+    }
+
     private PrivateKey parsePrivateKeyOrNull(String pem) {
         if (pem == null || pem.isBlank()) {
             return null;

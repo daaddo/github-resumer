@@ -6,6 +6,7 @@ import it.davidecascella.githubresumer.client.dto.GitHubUser;
 import it.davidecascella.githubresumer.client.dto.InstallationRepositoriesResponse;
 import it.davidecascella.githubresumer.client.dto.InstallationTokenResponse;
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -54,24 +55,23 @@ public interface GitHubApiClient {
     );
 
     /**
-     * Repository di una specifica installazione ACCESSIBILI all'utente autenticato (user-to-server
-     * token). Ritorna i repo solo se l'utente ha davvero accesso a quell'installazione, altrimenti 404:
-     * è così che verifichiamo la proprietà dell'installation_id (anti-IDOR).
-     */
-    @GetMapping("/user/installations/{installationId}/repositories")
-    InstallationRepositoriesResponse getUserInstallationRepositories(
-            @RequestHeader("Authorization") String bearerUserToken,
-            @PathVariable("installationId") long installationId,
-            @RequestParam("per_page") int perPage,
-            @RequestParam("page") int page
-    );
-
-    /**
      * Crea un installation access token a partire dal JWT della GitHub App.
      * @param bearerAppJwt header "Bearer <app-jwt>"
      */
     @PostMapping("/app/installations/{installationId}/access_tokens")
     InstallationTokenResponse createInstallationToken(
+            @PathVariable("installationId") long installationId,
+            @RequestHeader("Authorization") String bearerAppJwt
+    );
+
+    /**
+     * Disinstalla la GitHub App da una installazione (autenticazione "come App", JWT).
+     * Usata per RIFIUTARE un'installazione di un utente non registrato: GitHub rimuove
+     * l'installazione e invia a sua volta un evento "installation/deleted".
+     * @param bearerAppJwt header "Bearer <app-jwt>"
+     */
+    @DeleteMapping("/app/installations/{installationId}")
+    void deleteInstallation(
             @PathVariable("installationId") long installationId,
             @RequestHeader("Authorization") String bearerAppJwt
     );
